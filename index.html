@@ -365,7 +365,7 @@
   <header>
     <h1>교사용 카페인·수면 분석자료 생성기 v73</h1>
     <p>교사가 카페인·수면 원자료를 넣으면, 학생 활동에 사용할 반별·개인별 분석 데이터와 AI 분석용 CSV를 자동 생성합니다.</p>
-    <p id="publication-update">최근 반영: 2026-10-25T13:24:57Z (UTC). 수면시간 표시를 소수 첫째 자리로 통일했습니다. 최신 화면이 보이지 않으면 파일 선택 전에 Ctrl+F5로 새로고침하세요.</p>
+    <p id="publication-update">최근 반영: 2026-10-25T14:14:02Z (UTC). 3차시 학생용 파일을 6개 탭으로 정리하고 수면 평균 구간표를 추가했습니다. 최신 화면이 보이지 않으면 파일 선택 전에 Ctrl+F5로 새로고침하세요.</p>
   </header>
 
   <main>
@@ -2923,54 +2923,81 @@ function researchCaffeineSheets(source, period) {
 
     function buildClassVisualizationWorkbook(klass = "") {
       if (!requireResolvedIdentity()) return null;
-      const classRows = state.classSummary.filter(row => !klass || String(row.반) === String(klass));
       const wb = XLSX.utils.book_new();
+      // Bucket from the same student/day records as the scatter plot, before display rounding.
+      const meanGroups = groupBy(classDailyRows(klass), ["익명ID"]);
+      const sleepMeans = meanGroups.map(({ rows }) => avg(rows, "수면시간_h"));
+      const validMeans = sleepMeans.filter(mean => typeof mean === "number" && Number.isFinite(mean));
+      const bucketLabels = ["6시간 미만", "6시간 이상~7시간 미만", "7시간 이상~8시간 미만", "8시간 이상"];
+      const bucketCounts = [0, 0, 0, 0];
+      validMeans.forEach(mean => { bucketCounts[mean < 6 ? 0 : mean < 7 ? 1 : mean < 8 ? 2 : 3]++; });
+      const bucketTotal = bucketCounts.reduce((sum, count) => sum + count, 0);
+      const missingMeans = sleepMeans.length - validMeans.length;
+      if (bucketTotal !== validMeans.length || bucketTotal + missingMeans !== meanGroups.length) throw new Error("수면 평균 구간별 학생 수 검증에 실패했습니다.");
+
+      const classByStudent = new Map((state.rawStudents || []).map(row => [
+        idText(identityValue(row, ["전체학번", "학번", "학생ID", "id"])), String(value(row, ["반"]))
+      ]));
+      const unknownIntakeCount = (state.rawCaffeine || []).filter(row => {
+        const sid = idText(identityValue(row, ["전체학번", "학번", "학생ID"]));
+        const rowClass = String(value(row, ["반"]) || classByStudent.get(sid) || "");
+        return (!klass || rowClass === String(klass)) && num(value(row, ["함량", "카페인(mg)", "카페인mg", "카페인"])) > 0
+          && !parseDateTimeFlexible(value(row, ["섭취시간", "섭취 시간"]));
+      }).length;
+      const timeRows = caffeineTimeRows(klass).slice(0, 5).map(row => ({ 시간대: row.시간대, "섭취 기록 수(건)": row.섭취횟수 }));
+      if (unknownIntakeCount) timeRows.push({ 시간대: "시간 미상", "섭취 기록 수(건)": unknownIntakeCount });
+      const timeRange = unknownIntakeCount ? "A1:B7" : "A1:B6";
+      const scatter = classScatterRows(klass);
+      const scatterEnd = scatter.length + 1;
+
       appendSleepFormattedSheet(wb, XLSX.utils.json_to_sheet(oneColumnSheet([
-        "[3차시] 우리 반 카페인·수면 패턴 분석 활동",
-        "",
-        "★ 노란색 탭 시트가 오늘 직접 작업하는 시트입니다.",
-        "- 🟡반_음료별원본: 음료 종류별 집계 피벗 (질문 1번)",
-        "- 🟡반_일별원본: 수면·카페인 수치 분석 피벗 (질문 2~3번)",
-        "- 🟡오전오후저녁_비교: 오전·오후·저녁 카페인 여부별 비교 (질문 4번)",
-        "- 🟡그래프용_산점도: 학생 평균 데이터 산점도 (질문 5번)",
-        "",
-        "[STEP 1] 🟡반_음료별원본 시트 → 질문 1번",
-        "- 음료명 열로 피벗테이블을 만들어 음료별 섭취 횟수를 집계합니다.",
-        "- 주의: 이 시트는 음료별 집계 전용입니다.",
-        "  수면 평균 계산에는 사용하지 마세요 (같은 날 데이터가 중복됩니다).",
-        "",
-        "[STEP 2] 🟡반_일별원본 시트 → 질문 2~3번",
-        "- 날짜×학생 1행 구조입니다.",
-        "- 피벗테이블로 카페인 시간대별 횟수, 취침시간대 분포를 분석합니다.",
-        "- 오전/오후/저녁카페인여부의 합계는 그 시간대에 섭취한 날 수입니다.",
-        "- 카페인_시간대별은 원본 섭취 시각별 실제 섭취 횟수입니다. 날 수와 횟수는 다르므로 같은 값으로 검증하지 않습니다.",
-        "",
-        "[STEP 3] 🟡오전오후저녁_비교 시트 → 질문 4번",
-        "- 이미 계산된 비교표를 보고 차트 3개를 만듭니다.",
-        "- 수면시간 / 수면컨디션 / 컨디션좋음비율을 시간대별로 비교합니다.",
-        "- 차트를 만들기 전, 상관관계와 인과관계의 차이를 먼저 확인하세요 (학생 가이드 참고).",
-        "",
-        "[STEP 4] 🟡그래프용_산점도 또는 🟡반_일별원본 → 질문 5번",
-        "- 두 변수를 골라 산점도를 만들고 관계를 해석합니다.",
-        "- 산점도는 상관관계를 보여줄 뿐 인과관계를 증명하지 않습니다.",
-        "",
-        "[STEP 5] 결과 검증",
-        "- 흰색 탭 시트(카페인_종류별, 취침시간_분포 등)와 비교합니다.",
-        "",
-        "[STEP 6] 구글 활동지에 답변 작성",
+        "[3차시] 우리 반 자료로 다섯 가지 그래프 만들기",
+        "자기 반 파일의 6개 탭을 왼쪽부터 사용합니다. 준비된 집계표를 선택해 그래프를 만들고, 질문은 활동지에 답합니다.",
+        "[설명 1] 카페인 시간대 막대그래프",
+        "카페인_시간대별 시트 " + timeRange + " 선택 → 막대/세로 막대그래프. X축: 시간대, Y축: 섭취 기록 수(건). 기본 범위는 A1:B6입니다.",
+        "이 표는 함량이 0mg보다 큰 개별 섭취 기록 수입니다. 오전·오후·저녁의 일별 여부 합계는 섭취한 날 수이므로 섭취 기록 수(건)와 다릅니다.",
+        "0mg은 유효한 미섭취 기록으로 산점도의 평균 카페인량에 포함합니다. 0mg을 카페인을 마신 횟수로 세지는 않습니다.",
+        unknownIntakeCount ? "시간 미상 섭취 기록 " + unknownIntakeCount + "건은 A7:B7에 표시했습니다. 빠뜨리지 않도록 A1:B7 전체로 그래프를 만듭니다." : "섭취 시간이 없는 양성 섭취 기록이 생기면 시간 미상 행을 표시하고 선택 범위에 포함합니다.",
+        "[질문 1] 우리 반은 어느 시간대의 섭취 기록이 가장 많나요? 그래프의 기록 수(건)를 근거로 쓰세요.",
+        "[설명 2] 취침시간 분포 막대그래프",
+        "취침시간_분포 시트 A1:B7 선택 → 막대/세로 막대그래프. X축: 취침시간대, Y축: 수면 기록 수(건). 시간 미상 행도 포함합니다.",
+        "[질문 2] 가장 많은 취침시간대는 언제인가요? 분포의 특징을 쓰세요.",
+        "[설명 3] 기상시간 분포 막대그래프",
+        "기상시간_분포 시트 A1:B6 선택 → 막대/세로 막대그래프. X축: 기상시간대, Y축: 수면 기록 수(건). 시간 미상 행도 포함합니다.",
+        "[질문 3] 가장 많은 기상시간대는 언제인가요? 취침 분포와 함께 읽어 보세요.",
+        "[설명 4] 학생 평균 수면시간 구간 원형그래프",
+        "수면평균_구간별 시트 A1:B5 선택 → 원형그래프. 범주: 수면평균구간, 값: 학생수(명). 준비된 표를 쓰므로 COUNTIFS 입력이나 구간 전처리를 직접 할 필요가 없습니다.",
+        "구간 순서: 6시간 미만 → 6시간 이상~7시간 미만 → 7시간 이상~8시간 미만 → 8시간 이상. 학생별 여러 날의 평균으로 학생 한 명을 한 번만 셉니다.",
+        "수면시간 표시는 소수 첫째 자리이며 구간 판단은 반올림 전 평균을 사용합니다. F열에서 6.0으로 보여도 원평균이 6시간 미만이면 첫 구간에 포함됩니다. 20시간 이상도 자동 제외하지 않습니다.",
+        "빈칸은 0시간이 아닙니다. 수면평균_구간별 D1:E6에서 구간 합계·유효·결측·분석자료 학생수와 총원 일치를 확인하세요. 명단 전체가 아니라 산점도와 같은 분석자료 학생 기준입니다.",
+        "평균 수면시간이 결측인 학생은 원형그래프에서 제외하고 결측 수로 따로 표시합니다. 유효 학생이 0명이면 원형그래프를 그리지 말고 결측 수를 확인합니다.",
+        "[질문 4] 어느 수면 평균 구간의 학생이 가장 많나요? 전체 유효 학생 중 비중을 설명하세요.",
+        "[설명 5] 카페인량·컨디션 산점도와 선형 추세선",
+        "🟡그래프용_산점도 시트에서 X축은 B열 평균카페인량(mg), Y축은 G열 평균수면컨디션점수입니다. 데이터 행: 2~" + scatterEnd + "행. B1:B" + scatterEnd + "와 G1:G" + scatterEnd + "을 각각 선택·지정합니다.",
+        "F열 평균수면시간은 원래 위치를 유지하며 소수 첫째 자리로 표시합니다. B/F/G 열 순서와 계산값은 그대로입니다. 빈칸은 0으로 채우지 않습니다.",
+        "두 수치가 모두 있는 학생으로 산점도를 만든 뒤 선형 추세선을 추가합니다. B열의 숫자 0mg은 포함합니다. 컨디션 점수는 높을수록 기상 후 상태가 좋음을 뜻합니다.",
+        "[질문 5] 점과 선형 추세선은 어떤 경향을 보이나요? 상관관계가 인과관계를 증명하지 않는 이유도 쓰세요.",
+        "질문에 답할 때 시간 미상·결측 수를 함께 확인합니다. 시간 미상은 화면이나 그래프에서 숨겨 누락시키지 않습니다.",
       ])), "활동안내");
-      appendJsonSheetWithTabColor(wb, classDrinkRows(klass), "🟡반_음료별원본");
-      appendSleepFormattedSheet(wb, XLSX.utils.json_to_sheet(caffeineDrinkRows(klass)), "카페인_종류별");
-      appendJsonSheetWithTabColor(wb, classDailyRawRows(klass), "🟡반_일별원본");
-      appendSleepFormattedSheet(wb, XLSX.utils.json_to_sheet(caffeineTimeRows(klass)), "카페인_시간대별");
+      appendSleepFormattedSheet(wb, XLSX.utils.json_to_sheet(timeRows), "카페인_시간대별");
       appendSleepFormattedSheet(wb, XLSX.utils.json_to_sheet(distributionRows(klass, "취침시간", bedtimeBand, ["22시 이전", "22시대", "23시대", "0시대", "1시 이후", "시간 미상"], "취침시간대")), "취침시간_분포");
-      appendJsonSheetWithTabColor(wb, flagCompareRows(klass), "🟡오전오후저녁_비교");
-      appendJsonSheetWithTabColor(wb, classScatterRows(klass), "🟡그래프용_산점도");
-      appendSleepFormattedSheet(wb, XLSX.utils.json_to_sheet(classRows), "반별_핵심요약");
       appendSleepFormattedSheet(wb, XLSX.utils.json_to_sheet(distributionRows(klass, "기상시간", wakeBand, ["6시 이전", "6시대", "7시대", "8시 이후", "시간 미상"], "기상시간대")), "기상시간_분포");
-      appendSleepFormattedSheet(wb, XLSX.utils.json_to_sheet(state.variableDescriptions), "변수설명");
-      appendSleepFormattedSheet(wb,XLSX.utils.json_to_sheet((state.episodeRecords||[]).filter(r=>!klass||String(r.반)===String(klass)).map(r=>pickColumns(r,['익명ID','기록ID','분석일','실제취침일','취침시간','주수면분석상태','ID버전충돌','취침4시간이내카페인여부','취침전4시간_기록상태','취침6시간이내카페인여부','취침전6시간_기록상태','취침8시간이내카페인여부','취침전8시간_기록상태','취침12시간이내카페인여부','취침전12시간_기록상태']))),'취침전시간창_기록상태');
-      return appendProcessingSummary(wb);
+      const bucketSheet = XLSX.utils.json_to_sheet(bucketLabels.map((label, i) => ({ 수면평균구간: label, 학생수: bucketCounts[i] })));
+      XLSX.utils.sheet_add_aoa(bucketSheet, [["검증 항목", "학생수"], ["4개 구간 합계", bucketTotal], ["평균수면시간 유효 학생수", validMeans.length], ["평균수면시간 결측 학생수", missingMeans], ["분석자료 학생수", meanGroups.length], ["총원 확인", "일치"]], { origin: "D1" });
+      appendSleepFormattedSheet(wb, bucketSheet, "수면평균_구간별");
+      appendJsonSheetWithTabColor(wb, scatter, "🟡그래프용_산점도");
+      const guideSheet = wb.Sheets["활동안내"];
+      guideSheet["!cols"] = [{ wch: 112 }];
+      guideSheet["!rows"] = [];
+      Object.entries(guideSheet).forEach(([address, cell]) => {
+        if (address.startsWith("!") || typeof cell.v !== "string") return;
+        const question = cell.v.startsWith("[질문"), explanation = cell.v.startsWith("[설명");
+        cell.s = { alignment: { wrapText: true, vertical: "top" },
+          ...(question || explanation ? { font: { bold: true }, fill: { patternType: "solid", fgColor: { rgb: question ? "FFF2CC" : "E2F0D9" } } } : {}) };
+        guideSheet["!rows"][XLSX.utils.decode_cell(address).r] = { hpt: Math.max(28, Math.ceil(cell.v.length / 54) * 18 + 8) };
+      });
+      bucketSheet["!cols"] = [{ wch: 34 }, { wch: 12 }, { wch: 3 }, { wch: 31 }, { wch: 14 }];
+      return wb;
     }
 
     function buildQualityWorkbook(klass) {
