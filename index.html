@@ -365,7 +365,7 @@
   <header>
     <h1>교사용 카페인·수면 분석자료 생성기 v73</h1>
     <p>교사가 카페인·수면 원자료를 넣으면, 학생 활동에 사용할 반별·개인별 분석 데이터와 AI 분석용 CSV를 자동 생성합니다.</p>
-    <p id="publication-update">최근 반영: 2026-10-25T11:08:11Z (UTC). 최신 화면이 보이지 않으면 파일 선택 전에 Ctrl+F5로 새로고침하세요.</p>
+    <p id="publication-update">최근 반영: 2026-10-25T13:24:57Z (UTC). 수면시간 표시를 소수 첫째 자리로 통일했습니다. 최신 화면이 보이지 않으면 파일 선택 전에 Ctrl+F5로 새로고침하세요.</p>
   </header>
 
   <main>
@@ -880,12 +880,57 @@ var SleepRecordPolicy = (function () {
       ]);
     }
 
+    // Display only: keep numeric values, formulas and all analysis rules unchanged.
+    function isSleepHoursHeader(header) {
+      const key = String(header ?? "").replace(/\s+/g, "");
+      return /^(?:원자료|나의_|반평균_|초기|종료|처음기록|마지막실천)?(?:평균)?수면시간(?:_h|\(h\)|\(시간\))?$/.test(key)
+        || /^(?:자가보고|총)?취침기상간시간(?:_h|\(h\))?$/.test(key)
+        || /^수면시간변화(?:_h)?$/.test(key);
+    }
+
+    function isSleepHoursCell(header, row) {
+      if (isSleepHoursHeader(header)) return true;
+      const key = String(header ?? "").replace(/\s+/g, "");
+      const item = String(row.항목 ?? "").replace(/\s+/g, "");
+      if (key === "원본값" && ["수면시간_분류", "권장수면여부"].includes(item)) return true;
+      if (key === "전처리값" && item === "수면시간") return true;
+      if (["처음기록", "마지막실천"].includes(key) && isSleepHoursHeader(item)) return true;
+      if (key === "학생별평균의평균" && isSleepHoursHeader(row.지표)) return true;
+      return key === "원자료값" && /^수면시간 (?:부족|과다) 이상치$/.test(String(row.오류유형 ?? ""));
+    }
+
+    function displayCellValue(header, row) {
+      const value = row[header];
+      return typeof value === "number" && Number.isFinite(value) && isSleepHoursCell(header, row)
+        ? (Math.sign(value) * Math.round((Math.abs(value) + Number.EPSILON) * 10) / 10).toFixed(1) : value;
+    }
+
+    function appendSleepFormattedSheet(wb, ws, sheetName) {
+      if (ws["!ref"]) {
+        const range = XLSX.utils.decode_range(ws["!ref"]);
+        const headers = [];
+        for (let col = range.s.c; col <= range.e.c; col++) headers[col] = ws[XLSX.utils.encode_cell({ r: range.s.r, c: col })]?.v;
+        for (let r = range.s.r + 1; r <= range.e.r; r++) {
+          const row = {};
+          headers.forEach((header, c) => { row[header] = ws[XLSX.utils.encode_cell({ r, c })]?.v; });
+          headers.forEach((header, c) => {
+            const cell = ws[XLSX.utils.encode_cell({ r, c })];
+            if (cell?.t === "n" && Number.isFinite(cell.v) && isSleepHoursCell(header, row)) {
+              cell.z = "0.0";
+              delete cell.w;
+            }
+          });
+        }
+      }
+      return XLSX.utils.book_append_sheet(wb, ws, sheetName);
+    }
+
     function appendJsonSheet(wb, rows, sheetName, options = {}) {
       const ws = XLSX.utils.json_to_sheet(rows);
       if (options.statusColumn) {
         applyStatusRowFill(ws, rows, options.statusColumn, options.statusValues || ["수정 필요", "확인필요"]);
       }
-      XLSX.utils.book_append_sheet(wb, ws, sheetName);
+      appendSleepFormattedSheet(wb, ws, sheetName);
       return ws;
     }
 
@@ -1193,7 +1238,7 @@ var SleepRecordPolicy = (function () {
     function appendJsonSheetWithTabColor(wb, rows, sheetName, rgb = "FFFFFF00") {
       const ws = XLSX.utils.json_to_sheet(rows);
       setTabColor(ws, rgb);
-      XLSX.utils.book_append_sheet(wb, ws, sheetName);
+      appendSleepFormattedSheet(wb, ws, sheetName);
       setWorkbookTabColor(wb, sheetName, rgb);
       return ws;
     }
@@ -1563,7 +1608,7 @@ var SleepRecordPolicy = (function () {
     }
 
     function appendProcessingSummary(wb) {
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(processingSummary()), "처리요약");
+      appendSleepFormattedSheet(wb, XLSX.utils.json_to_sheet(processingSummary()), "처리요약");
       return wb;
     }
 
@@ -1582,7 +1627,7 @@ var SleepRecordPolicy = (function () {
     }
 
     function labelExampleWorkbook(wb) {
-      if (!wb.SheetNames.includes("수업용 예시 안내")) XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet([
+      if (!wb.SheetNames.includes("수업용 예시 안내")) appendSleepFormattedSheet(wb, XLSX.utils.json_to_sheet([
         { 항목: "자료 구분", 내용: "수업용 예시 데이터" },
         { 항목: "계정", 내용: "학번 0 / 이름 테스트 / 연구코드 TEST00" },
         { 항목: "사용 목적", 내용: "휴대폰을 사용하지 못하는 학생의 개별 분석 연습용. 실제 학생의 반별·연구용 집계에서 제외합니다." },
@@ -2322,7 +2367,7 @@ function researchCaffeineSheets(source, period) {
         return;
       }
       const headers = Object.keys(rows[0]);
-      $("table").innerHTML = `<table><thead><tr>${headers.map(h => `<th>${escapeHtml(h)}</th>`).join("")}</tr></thead><tbody>${rows.map(row => `<tr>${headers.map(h => `<td>${escapeHtml(row[h])}</td>`).join("")}</tr>`).join("")}</tbody></table>`;
+      $("table").innerHTML = `<table><thead><tr>${headers.map(h => `<th>${escapeHtml(h)}</th>`).join("")}</tr></thead><tbody>${rows.map(row => `<tr>${headers.map(h => `<td>${escapeHtml(displayCellValue(h, row))}</td>`).join("")}</tr>`).join("")}</tbody></table>`;
     }
 
     // ─── 반·학생 선택 드롭다운 채우기 ────────────────────────────────
@@ -2709,7 +2754,7 @@ function researchCaffeineSheets(source, period) {
         { 항목: "수면 원본 기록 수", 값: sleepRows.length },
       ];
       const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(oneColumnSheet([
+      appendSleepFormattedSheet(wb, XLSX.utils.json_to_sheet(oneColumnSheet([
         "이 파일은 2차시 내 데이터 점검 활동용입니다.",
         "1. 날짜별 카페인·수면 기록을 실제 기록 있음 / 미기록 / 확인이 필요한 오류로 구분합니다.",
         "2. 당시 미섭취로 직접 기록한 0mg은 유효합니다. 빈칸·함량 불명은 미기록(결측)이며 0mg이 아닙니다.",
@@ -2722,11 +2767,11 @@ function researchCaffeineSheets(source, period) {
         "9. 함량이 하나라도 불명인 날짜의 카페인 합계는 결측(빈칸)입니다. 알려진 일부 함량의 합계를 완전한 하루 총량으로 쓰지 않습니다.",
         "10. 원본_카페인과 원본_수면 시트에는 해당 학생의 원본 기록만 들어 있습니다. 이 점검 파일의 값을 바꾸어도 앱 원자료가 수정되지는 않습니다."
       ])), "활동안내");
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(summary), "점검요약");
+      appendSleepFormattedSheet(wb, XLSX.utils.json_to_sheet(summary), "점검요약");
       appendJsonSheet(wb, checkRows, "날짜별_누락점검", { statusColumn: "점검 상태", statusValues: ["수정 필요"] });
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(formatStudentRawRows(caffeineRows)), "원본_카페인");
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(formatStudentRawRows(sleepRows)), "원본_수면");
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet([
+      appendSleepFormattedSheet(wb, XLSX.utils.json_to_sheet(formatStudentRawRows(caffeineRows)), "원본_카페인");
+      appendSleepFormattedSheet(wb, XLSX.utils.json_to_sheet(formatStudentRawRows(sleepRows)), "원본_수면");
+      appendSleepFormattedSheet(wb, XLSX.utils.json_to_sheet([
         { 구분: "날짜", 확인내용: "교사가 지정한 점검 시작일~종료일 범위의 날짜가 모두 있는지 확인" },
         { 구분: "카페인", 확인내용: "당시 미섭취로 직접 기록한 0mg은 유효. 빈칸·함량 불명은 결측이며 0mg이 아님. 일부 함량이 불명이면 하루 합계도 결측으로 유지" },
         { 구분: "과거 미기록", 확인내용: "기억·평소 습관으로 추정하여 채우지 않음. 날짜·항목·상황을 활동지에 적고 교사에게 알림" },
@@ -2734,7 +2779,7 @@ function researchCaffeineSheets(source, period) {
         { 구분: "수면", 확인내용: "취침시간, 기상시간, 수면시간이 빠지지 않았는지 확인" },
         { 구분: "수면 품질", 확인내용: "😫, 😴, 😐, 🙂, 😊 중 하나로 입력되어 점수화되는지 확인" },
       ]), "점검기준");
-      if(!wb.SheetNames.includes('수면기록_상태'))XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet((state.episodeRecords||[]).filter(r=>r.익명ID===sid).map(({이름,번호,_학번,...r})=>r)),'수면기록_상태');
+      if(!wb.SheetNames.includes('수면기록_상태'))appendSleepFormattedSheet(wb,XLSX.utils.json_to_sheet((state.episodeRecords||[]).filter(r=>r.익명ID===sid).map(({이름,번호,_학번,...r})=>r)),'수면기록_상태');
       return { wb, info };
     }
 
@@ -2848,7 +2893,7 @@ function researchCaffeineSheets(source, period) {
       const graphRows = myRows.map(row => pickColumns(row, ["분석일", "나의_일일카페인총량_mg", "나의_수면시간_h", "나의_컨디션_점수", "반평균_컨디션_점수", "나의_취침전스마트폰_점수", "나의_수면잠복기_점수", "나의_중도각성_점수"]));
 
       const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(oneColumnSheet([
+      appendSleepFormattedSheet(wb, XLSX.utils.json_to_sheet(oneColumnSheet([
         "이 파일은 4차시 개인 데이터 분석 활동용입니다.",
         "1. 개인_일별자료 시트에서 나의 카페인량, 수면시간, 컨디션 변화를 확인합니다.",
         "2. 그래프용 시트에서 산점도 또는 선그래프를 만듭니다.",
@@ -2857,14 +2902,14 @@ function researchCaffeineSheets(source, period) {
         "5. 해석질문 시트에 나의 가설을 작성합니다.",
       ])), "활동안내");
       appendJsonSheet(wb, personalRows, "개인_일별자료", { statusColumn: "점검 상태", statusValues: ["수정 필요"] });
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(compareRows), "반평균_비교");
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(graphRows), "그래프용");
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(questionSheet([
+      appendSleepFormattedSheet(wb, XLSX.utils.json_to_sheet(compareRows), "반평균_비교");
+      appendSleepFormattedSheet(wb, XLSX.utils.json_to_sheet(graphRows), "그래프용");
+      appendSleepFormattedSheet(wb, XLSX.utils.json_to_sheet(questionSheet([
         "나의 수면시간과 카페인량은 어떤 관계로 보이나요?",
         "반 평균과 비교했을 때 내가 높은 항목과 낮은 항목은 무엇인가요?",
         "나의 수면에 영향을 준 것 같은 요인 2가지를 고르고 근거를 적어보세요.",
       ])), "해석질문");
-      if(!wb.SheetNames.includes('수면기록_상태'))XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet((state.episodeRecords||[]).filter(r=>r.익명ID===sid).map(({이름,번호,_학번,...r})=>r)),'수면기록_상태');
+      if(!wb.SheetNames.includes('수면기록_상태'))appendSleepFormattedSheet(wb,XLSX.utils.json_to_sheet((state.episodeRecords||[]).filter(r=>r.익명ID===sid).map(({이름,번호,_학번,...r})=>r)),'수면기록_상태');
       return { wb, info };
     }
 
@@ -2880,7 +2925,7 @@ function researchCaffeineSheets(source, period) {
       if (!requireResolvedIdentity()) return null;
       const classRows = state.classSummary.filter(row => !klass || String(row.반) === String(klass));
       const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(oneColumnSheet([
+      appendSleepFormattedSheet(wb, XLSX.utils.json_to_sheet(oneColumnSheet([
         "[3차시] 우리 반 카페인·수면 패턴 분석 활동",
         "",
         "★ 노란색 탭 시트가 오늘 직접 작업하는 시트입니다.",
@@ -2915,16 +2960,16 @@ function researchCaffeineSheets(source, period) {
         "[STEP 6] 구글 활동지에 답변 작성",
       ])), "활동안내");
       appendJsonSheetWithTabColor(wb, classDrinkRows(klass), "🟡반_음료별원본");
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(caffeineDrinkRows(klass)), "카페인_종류별");
+      appendSleepFormattedSheet(wb, XLSX.utils.json_to_sheet(caffeineDrinkRows(klass)), "카페인_종류별");
       appendJsonSheetWithTabColor(wb, classDailyRawRows(klass), "🟡반_일별원본");
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(caffeineTimeRows(klass)), "카페인_시간대별");
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(distributionRows(klass, "취침시간", bedtimeBand, ["22시 이전", "22시대", "23시대", "0시대", "1시 이후", "시간 미상"], "취침시간대")), "취침시간_분포");
+      appendSleepFormattedSheet(wb, XLSX.utils.json_to_sheet(caffeineTimeRows(klass)), "카페인_시간대별");
+      appendSleepFormattedSheet(wb, XLSX.utils.json_to_sheet(distributionRows(klass, "취침시간", bedtimeBand, ["22시 이전", "22시대", "23시대", "0시대", "1시 이후", "시간 미상"], "취침시간대")), "취침시간_분포");
       appendJsonSheetWithTabColor(wb, flagCompareRows(klass), "🟡오전오후저녁_비교");
       appendJsonSheetWithTabColor(wb, classScatterRows(klass), "🟡그래프용_산점도");
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(classRows), "반별_핵심요약");
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(distributionRows(klass, "기상시간", wakeBand, ["6시 이전", "6시대", "7시대", "8시 이후", "시간 미상"], "기상시간대")), "기상시간_분포");
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(state.variableDescriptions), "변수설명");
-      XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet((state.episodeRecords||[]).filter(r=>!klass||String(r.반)===String(klass)).map(r=>pickColumns(r,['익명ID','기록ID','분석일','실제취침일','취침시간','주수면분석상태','ID버전충돌','취침4시간이내카페인여부','취침전4시간_기록상태','취침6시간이내카페인여부','취침전6시간_기록상태','취침8시간이내카페인여부','취침전8시간_기록상태','취침12시간이내카페인여부','취침전12시간_기록상태']))),'취침전시간창_기록상태');
+      appendSleepFormattedSheet(wb, XLSX.utils.json_to_sheet(classRows), "반별_핵심요약");
+      appendSleepFormattedSheet(wb, XLSX.utils.json_to_sheet(distributionRows(klass, "기상시간", wakeBand, ["6시 이전", "6시대", "7시대", "8시 이후", "시간 미상"], "기상시간대")), "기상시간_분포");
+      appendSleepFormattedSheet(wb, XLSX.utils.json_to_sheet(state.variableDescriptions), "변수설명");
+      appendSleepFormattedSheet(wb,XLSX.utils.json_to_sheet((state.episodeRecords||[]).filter(r=>!klass||String(r.반)===String(klass)).map(r=>pickColumns(r,['익명ID','기록ID','분석일','실제취침일','취침시간','주수면분석상태','ID버전충돌','취침4시간이내카페인여부','취침전4시간_기록상태','취침6시간이내카페인여부','취침전6시간_기록상태','취침8시간이내카페인여부','취침전8시간_기록상태','취침12시간이내카페인여부','취침전12시간_기록상태']))),'취침전시간창_기록상태');
       return appendProcessingSummary(wb);
     }
 
@@ -2960,16 +3005,16 @@ function researchCaffeineSheets(source, period) {
         "수정 방법": row.권장처리,
       }));
       const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(summary), "기록품질_요약");
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(errorRows), "오류목록");
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(oneColumnSheet([
+      appendSleepFormattedSheet(wb, XLSX.utils.json_to_sheet(summary), "기록품질_요약");
+      appendSleepFormattedSheet(wb, XLSX.utils.json_to_sheet(errorRows), "오류목록");
+      appendSleepFormattedSheet(wb, XLSX.utils.json_to_sheet(oneColumnSheet([
         "카페인 함량이 없으면 숫자로 입력하거나, 섭취하지 않은 날은 0으로 입력한다.",
         "수면 컨디션은 😫, 😴, 😐, 🙂, 😊 중 하나만 사용한다. 4~5점은 컨디션 좋음, 수면시간 8~10시간 충족 여부는 별도로 확인한다.",
         "취침전 스마트폰 사용은 안 함, 30분 미만, 30~60분, 60분 이상 중 하나만 사용한다.",
         "중도각성횟수는 없음, 1번, 2번, 3번 이상 중 하나만 사용한다.",
         "날짜는 YYYY-MM-DD 형식으로 정리한다.",
       ])), "수정안내");
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(oneColumnSheet([
+      appendSleepFormattedSheet(wb, XLSX.utils.json_to_sheet(oneColumnSheet([
         "이 파일은 3차시 기록 품질 점검 활동용입니다.",
         "1. 기록품질_요약 시트를 확인합니다.",
         "2. 오류목록 시트에서 어떤 오류가 많은지 확인합니다.",
@@ -3176,7 +3221,7 @@ function researchCaffeineSheets(source, period) {
       const detailedCheckRows = buildClassDetailedCheckRows(klass);
       const reviewErrors = enrichReviewErrors(errors, detailedCheckRows);
       const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet([
+      appendSleepFormattedSheet(wb, XLSX.utils.json_to_sheet([
         { 항목: "차시", 값: `${lesson}차시` },
         { 항목: "반", 값: klass ? `${klass}반` : "전체" },
         { 항목: "원본 카페인 기록 수", 값: rawCaffeine.length },
@@ -3186,28 +3231,28 @@ function researchCaffeineSheets(source, period) {
         { 항목: "날짜별 상세 검수 확인필요 수", 값: detailedCheckRows.filter(row => row.검수상태 === "확인필요").length },
         { 항목: "검수 방법", 값: "원자료_카페인/원자료_수면과 분석데이터, 전처리비교, 오류확인을 대조해 전처리 결과를 확인하세요." },
       ]), "검수요약");
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rawStudents), "원자료_학생정보");
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rawCaffeine), "원자료_카페인");
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rawSleep), "원자료_수면");
-      XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet((state.episodeRecords||[]).filter(r=>!klass||String(r.반)===String(klass)).map(({이름,번호,_학번,...r})=>r)),"수면기록_상태");
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(analysisRows), "분석데이터");
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(comparison), "전처리비교");
+      appendSleepFormattedSheet(wb, XLSX.utils.json_to_sheet(rawStudents), "원자료_학생정보");
+      appendSleepFormattedSheet(wb, XLSX.utils.json_to_sheet(rawCaffeine), "원자료_카페인");
+      appendSleepFormattedSheet(wb, XLSX.utils.json_to_sheet(rawSleep), "원자료_수면");
+      appendSleepFormattedSheet(wb,XLSX.utils.json_to_sheet((state.episodeRecords||[]).filter(r=>!klass||String(r.반)===String(klass)).map(({이름,번호,_학번,...r})=>r)),"수면기록_상태");
+      appendSleepFormattedSheet(wb, XLSX.utils.json_to_sheet(analysisRows), "분석데이터");
+      appendSleepFormattedSheet(wb, XLSX.utils.json_to_sheet(comparison), "전처리비교");
       appendJsonSheet(wb, reviewErrors, "오류확인", { statusColumn: "오류유형", statusValues: reviewErrors.map(row => row.오류유형).filter(Boolean) });
       appendJsonSheet(wb, detailedCheckRows, "날짜별_상세검수", { statusColumn: "검수상태", statusValues: ["확인필요"] });
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(classRows), "반별요약");
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(personalRows), "학생별요약");
+      appendSleepFormattedSheet(wb, XLSX.utils.json_to_sheet(classRows), "반별요약");
+      appendSleepFormattedSheet(wb, XLSX.utils.json_to_sheet(personalRows), "학생별요약");
       if (String(lesson) === "3") {
-        XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(caffeineDrinkRows(klass)), "3차시_카페인종류별");
-        XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(caffeineTimeRows(klass)), "3차시_카페인시간대별");
-        XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(flagCompareRows(klass)), "3차시_오전오후저녁비교");
-        XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(classScatterRows(klass)), "3차시_산점도검수");
+        appendSleepFormattedSheet(wb, XLSX.utils.json_to_sheet(caffeineDrinkRows(klass)), "3차시_카페인종류별");
+        appendSleepFormattedSheet(wb, XLSX.utils.json_to_sheet(caffeineTimeRows(klass)), "3차시_카페인시간대별");
+        appendSleepFormattedSheet(wb, XLSX.utils.json_to_sheet(flagCompareRows(klass)), "3차시_오전오후저녁비교");
+        appendSleepFormattedSheet(wb, XLSX.utils.json_to_sheet(classScatterRows(klass)), "3차시_산점도검수");
       }
       if (String(lesson) === "4") {
         const treeRows = state.analysis
           .filter(row => (!klass || String(row.반) === String(klass)) && row.컨디션좋음여부 !== "")
           .map(row => pickColumns(row, treeColumns))
           .filter(row => treeColumns.every(col => SleepRecordPolicy.amount(row[col]) !== null));
-        XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(treeRows), "4차시_AI입력검수");
+        appendSleepFormattedSheet(wb, XLSX.utils.json_to_sheet(treeRows), "4차시_AI입력검수");
       }
       return appendProcessingSummary(wb);
     }
@@ -3306,7 +3351,7 @@ function researchCaffeineSheets(source, period) {
         "반별요약": state.classSummary,
       };
       Object.entries(sheets).forEach(([name, rows]) => {
-        XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(rows), name);
+        appendSleepFormattedSheet(workbook, XLSX.utils.json_to_sheet(rows), name);
       });
       const stamp = new Date().toISOString().slice(0, 16).replace(/[-:T]/g, "");
       appendProcessingSummary(workbook);
@@ -3822,7 +3867,7 @@ function researchCaffeineSheets(source, period) {
       const klass = $("classSelectTree")?.value || "";
       const modeStats = treeModeStats(cleanRows);
       const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(oneColumnSheet([
+      appendSleepFormattedSheet(wb, XLSX.utils.json_to_sheet(oneColumnSheet([
         "이 파일은 4차시 AI 의사결정트리 해석 활동용입니다.",
         "1. AI가 어떤 변수를 사용했는지 확인합니다.",
         "2. AI가 이번 데이터에서 트리를 나눌 때 사용한 변수를 확인합니다.",
@@ -3830,7 +3875,7 @@ function researchCaffeineSheets(source, period) {
         "4. 최종적으로 나의 수면에 영향을 준 요인을 선택합니다.",
         "주의: 이 트리는 원인을 확정하는 정답표가 아니라 현재 데이터에서 보이는 임시 패턴입니다.",
       ])), "활동안내");
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet([
+      appendSleepFormattedSheet(wb, XLSX.utils.json_to_sheet([
         { 항목: "분석 대상", 내용: klass ? `${klass}반` : "전체" },
         { 항목: "카페인 0mg 처리", 내용: "카페인을 마시지 않았다고 기록한 날이므로 분석에 포함" },
         { 항목: "카페인 빈칸 처리", 내용: "미기록·함량 미상은 빈칸으로 보존하고 AI 입력에서 제외. 명시적 0mg만 유효한 0으로 사용" },
@@ -3853,8 +3898,8 @@ function researchCaffeineSheets(source, period) {
           "주의할 점": name === "컨디션좋음여부" ? "목표값이므로 입력 변수로 해석하지 않습니다." : "이번 데이터에서 트리를 나눌 때 참고한 생활습관 변수입니다.",
         };
       });
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(variableRows), "주요변수");
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(questionSheet([
+      appendSleepFormattedSheet(wb, XLSX.utils.json_to_sheet(variableRows), "주요변수");
+      appendSleepFormattedSheet(wb, XLSX.utils.json_to_sheet(questionSheet([
         "AI가 첫 번째 질문으로 이 기준을 선택한 이유는 무엇일까요?",
         "두 집단의 컨디션좋음비율은 각각 몇 %인가요?",
         "이 결과를 원인이라고 단정할 수 없는 이유는 무엇인가요?",
@@ -4005,7 +4050,7 @@ function researchCaffeineSheets(source, period) {
 
     function beforeAfterWorkbook(summary, detailRows, period) {
       const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(oneColumnSheet([
+      appendSleepFormattedSheet(wb, XLSX.utils.json_to_sheet(oneColumnSheet([
         "이 파일은 6차시 처음 기록·마지막 실천 비교 활동용입니다. 반별 일정 모드는 요약표의 학생별 날짜를 확인합니다.",
         `처음 기록 기간: ${dateKey(period.preStart)} ~ ${dateKey(period.preEnd)}`,
         `마지막 실천: ${dateKey(period.start)} ~ ${dateKey(period.end)}`,
@@ -4019,7 +4064,7 @@ function researchCaffeineSheets(source, period) {
         "평균 카페인총량은 함량이 확인된 기록일만 사용합니다. 명시적 0mg은 포함하고 미기록·함량 누락은 제외합니다. 취침 전 24시간 수업용 지표이며 논문용 달력 날짜 집계와 구분합니다.",
         "빈칸은 미섭취가 아니라 기록 누락 가능성이 있으므로 전후 비교에서 따로 확인해야 합니다.",
       ])), "활동안내");
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(summary), "전후비교_요약");
+      appendSleepFormattedSheet(wb, XLSX.utils.json_to_sheet(summary), "전후비교_요약");
       const chartRows = summary.flatMap(row => {
         const items = [
           ["평균 수면시간(시간)", "평균 수면시간"],
@@ -4033,9 +4078,9 @@ function researchCaffeineSheets(source, period) {
           항목: label, "처음 기록": row[`처음 기록 ${suffix}`], "마지막 실천": row[`마지막 실천 ${suffix}`]
         }));
       });
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(chartRows), "그래프용");
-      if (detailRows?.length) XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(detailRows), "기간별_원자료");
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(questionSheet([
+      appendSleepFormattedSheet(wb, XLSX.utils.json_to_sheet(chartRows), "그래프용");
+      if (detailRows?.length) appendSleepFormattedSheet(wb, XLSX.utils.json_to_sheet(detailRows), "기간별_원자료");
+      appendSleepFormattedSheet(wb, XLSX.utils.json_to_sheet(questionSheet([
         "처음 기록과 마지막 실천에 가장 크게 달라진 항목은 무엇인가요?",
         "그 변화가 행동 실험 때문이라고 볼 근거는 무엇인가요?",
         "다른 요인이 영향을 주었을 가능성은 무엇인가요?",
