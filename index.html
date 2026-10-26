@@ -366,7 +366,7 @@
   <header>
     <h1>교사용 카페인·수면 분석자료 생성기 v73</h1>
     <p>교사가 카페인·수면 원자료를 넣으면, 학생 활동에 사용할 반별·개인별 분석 데이터와 AI 분석용 CSV를 자동 생성합니다.</p>
-    <p id="publication-update">최근 반영: 2026-10-26T12:10:01Z (UTC). 3차시 추가 생활습관 그래프, 시간 확인 불가 기록 제외 안내와 시간대 범위를 반영했습니다. 최신 화면이 보이지 않으면 파일 선택 전에 Ctrl+F5로 새로고침하세요.</p>
+    <p id="publication-update">최근 반영: 2026-10-26T12:35:04Z (UTC). 카페인 시간대를 새벽(00~06시)·오전(06~12시) 등 6구간으로 재집계하고 그래프·해석·Excel 범위를 맞췄습니다. 최신 화면이 보이지 않으면 파일 선택 전에 Ctrl+F5로 새로고침하세요.</p>
   </header>
 
   <main>
@@ -1221,8 +1221,8 @@ var SleepRecordPolicy = (function () {
     }
 
     const LESSON3_ALL = "__lesson3_all_1_4__";
-    const LESSON3_CAFFEINE_BANDS=[["오전","00:00~12:00"],["점심 전후","12:00~14:00"],["오후","14:00~18:00"],["저녁","18:00~21:00"],["밤","21:00~24:00"]];
-    const LESSON3_CAFFEINE_NOTE="시작 시각 포함 · 끝 시각 제외 · 한국시간(KST) · 00:00은 오전";
+    const LESSON3_CAFFEINE_BANDS=[["새벽","00:00~06:00"],["오전","06:00~12:00"],["점심 전후","12:00~14:00"],["오후","14:00~18:00"],["저녁","18:00~21:00"],["밤","21:00~24:00"]];
+    const LESSON3_CAFFEINE_NOTE="시작 시각 포함 · 끝 시각 제외 · 한국시간(KST) · 00:00은 새벽";
     function lesson3ClassMatches(scope, klass) {
       return !scope || (scope===LESSON3_ALL ? ["1","2","3","4"].includes(String(klass)) : String(klass)===String(scope));
     }
@@ -1460,6 +1460,7 @@ var SleepRecordPolicy = (function () {
 
     function caffeineTimeBand(hour) {
       if (!Number.isFinite(hour)) return "시간 미상";
+      if (hour < 6) return "새벽";
       if (hour < 12) return "오전";
       if (hour < 14) return "점심 전후";
       if (hour < 18) return "오후";
@@ -1490,7 +1491,7 @@ var SleepRecordPolicy = (function () {
     function caffeineTimeRows(klass) {
       const selected=lesson3CaffeineSelection(klass),counts=new Map();
       selected.records.forEach(record=>{const band=caffeineTimeBand(record.intake.getHours());counts.set(band,(counts.get(band)||0)+1);});
-      return ["오전","점심 전후","오후","저녁","밤","시간 미상"].map(band=>({시간대:band,섭취횟수:band==="시간 미상"?selected.unknownIncluded:counts.get(band)||0}));
+      return [...LESSON3_CAFFEINE_BANDS.map(([band])=>band),"시간 미상"].map(band=>({시간대:band,섭취횟수:band==="시간 미상"?selected.unknownIncluded:counts.get(band)||0}));
     }
 
     function knownCaffeineValue(row){
@@ -3062,10 +3063,10 @@ function researchCaffeineSheets(source, period) {
       const missingMeans = sleepMeans.length - validMeans.length;
       if (bucketTotal !== validMeans.length || bucketTotal + missingMeans !== meanGroups.length) throw new Error("수면 평균 구간별 학생 수 검증에 실패했습니다.");
 
-      const unknownIntakeCount = lesson3CaffeineSelection(klass).unknownIncluded;
-      const timeRows = caffeineTimeRows(klass).slice(0, 5).map(row => ({ 시간대: row.시간대, "섭취 기록 수(건)": row.섭취횟수 }));
-      if (unknownIntakeCount) timeRows.push({ 시간대: "시간 미상", "섭취 기록 수(건)": unknownIntakeCount });
-      const timeRange = unknownIntakeCount ? "A1:B7" : "A1:B6";
+      const intakeSelection = lesson3CaffeineSelection(klass);
+      const unknownIntakeCount = intakeSelection.unknownIncluded + intakeSelection.unknownExcluded;
+      const timeRows = caffeineTimeRows(klass).filter(row=>row.시간대!=="시간 미상").map(row => ({ 시간대: row.시간대, "섭취 기록 수(건)": row.섭취횟수 }));
+      const timeRange = "A1:B7";
       const scatter = classScatterRows(klass);
       const scatterEnd = scatter.length + 1;
 
@@ -3073,11 +3074,11 @@ function researchCaffeineSheets(source, period) {
         "[3차시] 우리 반 자료로 다섯 가지 그래프 만들기",
         "자기 반 파일의 6개 탭을 왼쪽부터 사용합니다. 준비된 집계표를 선택해 그래프를 만들고, 질문은 활동지에 답합니다.",
         "[설명 1] 카페인 시간대 막대그래프",
-        "카페인_시간대별 시트 " + timeRange + " 선택 → 막대/세로 막대그래프. X축: 시간대, Y축: 섭취 기록 수(건). 기본 범위는 A1:B6입니다.",
+        "카페인_시간대별 시트 " + timeRange + " 선택 → 막대/세로 막대그래프. X축: 시간대, Y축: 섭취 기록 수(건). 기본 범위는 A1:B7이며 여섯 시간대를 모두 선택합니다.",
         "이 표는 함량이 0mg보다 큰 개별 섭취 기록 수입니다. 오전·오후·저녁의 일별 여부 합계는 섭취한 날 수이므로 섭취 기록 수(건)와 다릅니다.",
         "0mg은 유효한 미섭취 기록으로 산점도의 평균 카페인량에 포함합니다. 0mg을 카페인을 마신 횟수로 세지는 않습니다.",
-        "시간대(한국시간): " + LESSON3_CAFFEINE_BANDS.map(([label,range])=>label+" "+range).join(" / ") + ". " + LESSON3_CAFFEINE_NOTE + ". 12:00은 점심 전후, 21:00은 밤이며 24:00은 다음 날짜 00:00입니다. D1:E10에서 기준을 확인합니다.",
-        unknownIntakeCount ? "시간 미상 섭취 기록 " + unknownIntakeCount + "건은 A7:B7에 표시했습니다. 빠뜨리지 않도록 A1:B7 전체로 그래프를 만듭니다." : "섭취 시간이 없는 양성 섭취 기록이 생기면 시간 미상 행을 표시하고 선택 범위에 포함합니다.",
+        "시간대(한국시간): " + LESSON3_CAFFEINE_BANDS.map(([label,range])=>label+" "+range).join(" / ") + ". " + LESSON3_CAFFEINE_NOTE + ". 12:00은 점심 전후, 21:00은 밤이며 24:00은 다음 날짜 00:00입니다. D1:E11에서 기준을 확인합니다.",
+        unknownIntakeCount ? "시간 확인 불가 " + unknownIntakeCount + "건 제외: 원자료는 보존하고 A1:B7 그래프에는 포함하지 않습니다. D13:E14의 제외 안내를 확인합니다. 섭취일도 미상이면 선택 기간 포함 여부를 판단할 수 없습니다." : "섭취 시각을 확인할 수 없는 기록은 원자료에 보존하고 A1:B7 그래프 범위에서는 제외합니다.",
         "[질문 1] 우리 반은 어느 시간대의 섭취 기록이 가장 많나요? 그래프의 기록 수(건)를 근거로 쓰세요.",
         "[설명 2] 취침시간 분포 막대그래프",
         "취침시간_분포 시트 A1:B7 선택 → 막대/세로 막대그래프. X축: 취침시간대, Y축: 수면 기록 수(건). 시간 미상 행도 포함합니다.",
@@ -3101,7 +3102,9 @@ function researchCaffeineSheets(source, period) {
       ])), "활동안내");
       appendSleepFormattedSheet(wb, XLSX.utils.json_to_sheet(timeRows), "카페인_시간대별");
       const timeSheet=wb.Sheets["카페인_시간대별"];
-      XLSX.utils.sheet_add_aoa(timeSheet,[["시간대 기준 (한국시간)","시각 범위"],...LESSON3_CAFFEINE_BANDS,[],["범위 읽기","시작 시각 포함 / 끝 시각 제외"],["자정","00:00은 오전 (새 날짜)"],["예","12:00은 점심 전후 / 21:00은 밤"]],{origin:"D1"});
+      XLSX.utils.sheet_add_aoa(timeSheet,[["시간대 기준 (한국시간)","시각 범위"],...LESSON3_CAFFEINE_BANDS,[],["범위 읽기","시작 시각 포함 / 끝 시각 제외"],["자정","00:00은 새벽 (새 날짜)"],["예","12:00은 점심 전후 / 21:00은 밤"]],{origin:"D1"});
+      if(unknownIntakeCount)XLSX.utils.sheet_add_aoa(timeSheet,[["시간 확인 불가",unknownIntakeCount+"건 제외"]],{origin:"D13"});
+      if(intakeSelection.unknownExcluded)XLSX.utils.sheet_add_aoa(timeSheet,[["섭취일도 미상",intakeSelection.unknownExcluded+"건은 선택 기간 포함 여부 판단 불가"]],{origin:"D14"});
       timeSheet["!cols"]=[{wch:18},{wch:19},{wch:3},{wch:28},{wch:40}];
       Object.entries(timeSheet).forEach(([address,cell])=>{if(/^[DE]\d+$/.test(address))cell.s={alignment:{wrapText:true,vertical:"top"}};});
       appendSleepFormattedSheet(wb, XLSX.utils.json_to_sheet(distributionRows(klass, "취침시간", bedtimeBand, ["22시 이전", "22시대", "23시대", "0시대", "1시 이후", "시간 미상"], "취침시간대")), "취침시간_분포");
