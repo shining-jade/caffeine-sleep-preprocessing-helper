@@ -366,7 +366,7 @@
   <header>
     <h1>교사용 카페인·수면 분석자료 생성기 v73</h1>
     <p>교사가 카페인·수면 원자료를 넣으면, 학생 활동에 사용할 반별·개인별 분석 데이터와 AI 분석용 CSV를 자동 생성합니다.</p>
-    <p id="publication-update">최근 반영: 2026-10-26T07:59:54Z (UTC). 3차시 선택 반의 그래프 5개와 Q1~8 교사용 해석 예시·PNG/HTML 저장을 추가했습니다. 최신 화면이 보이지 않으면 파일 선택 전에 Ctrl+F5로 새로고침하세요.</p>
+    <p id="publication-update">최근 반영: 2026-10-26T09:41:49Z (UTC). 3차시 전체(1~4반) 통합 결과와 실제 기간 표시를 추가하고, 카페인 시간대의 기간 필터를 바로잡았습니다. 최신 화면이 보이지 않으면 파일 선택 전에 Ctrl+F5로 새로고침하세요.</p>
   </header>
 
   <main>
@@ -463,6 +463,7 @@
               <button id="downloadByClass" class="secondary">📥 3차시용 선택 반 활동지</button>
               <button id="downloadAllClass" class="secondary">📥 전체 반 활동지 일괄 생성</button>
               <button id="showLesson3Examples" class="secondary" disabled>📊 3차시 반별 모범답안 보기</button>
+              <span id="lesson3PeriodHint" style="font-size:12px;flex-basis:100%;">날짜 변경 후 전처리 재실행 · 전체는 1~4반 자료를 합칩니다.</span>
             </div>
           </div>
           <div id="lesson3ExamplePanel" style="display:none;padding:18px;"></div>
@@ -1219,8 +1220,74 @@ var SleepRecordPolicy = (function () {
       return lines.map((line, index) => ({ 번호: index + 1, 질문: line, 답변: "" }));
     }
 
+    const LESSON3_ALL = "__lesson3_all_1_4__";
+    function lesson3ClassMatches(scope, klass) {
+      return !scope || (scope===LESSON3_ALL ? ["1","2","3","4"].includes(String(klass)) : String(klass)===String(scope));
+    }
+    function lesson3ScopeLabel(scope) { return scope===LESSON3_ALL?"전체(1~4반)":scope?String(scope)+"반":"전체"; }
+    function lesson3StudentClasses() {
+      return new Map((state?.rawStudents||[]).map(row=>[idText(identityValue(row,["전체학번","학번","학생ID","id"])),String(value(row,["반"]))]));
+    }
+    function lesson3SourceClasses() {
+      const roster=lesson3StudentClasses(),classes=new Set();
+      for(const row of [...(state?.rawSleep||[]),...(state?.rawCaffeine||[])]) {
+        const sid=idText(identityValue(row,["전체학번","학번","학생ID","id"]));
+        const klass=String(value(row,["반"])||roster.get(sid)||"");if(klass)classes.add(klass);
+      }
+      return [...classes].sort((a,b)=>Number(a)-Number(b)||a.localeCompare(b));
+    }
+    function lesson3AvailableClasses() {
+      return [...new Set([...lesson3SourceClasses(),...(state?.rawStudents||[]).map(row=>String(value(row,["반"]))),...(state?.analysis||[]).map(row=>String(row.반||""))])].filter(Boolean).sort((a,b)=>Number(a)-Number(b)||a.localeCompare(b));
+    }
+    function lesson3ScopeIdentityProblem(scope) {
+      const groups=new Map();
+      for(const row of state?.rawStudents||[]) {
+        const sid=idText(identityValue(row,["전체학번","학번","학생ID","id"]));if(!sid)continue;
+        if(!groups.has(sid))groups.set(sid,[]);
+        groups.get(sid).push({name:idText(identityValue(row,["이름","성명","학생 이름"])),klass:idText(value(row,["반"])),grade:idText(value(row,["학년"])),number:idText(value(row,["번호"]))});
+      }
+      for(const rows of groups.values()) {
+        if(!rows.some(r=>lesson3ClassMatches(scope,r.klass)))continue;
+        if(["name","klass","grade","number"].some(key=>new Set(rows.map(r=>r[key]).filter(Boolean)).size>1))return true;
+      }
+      return false;
+    }
+    function lesson3ProcessedDates() {
+      return {start:state?.options?.analysisStart?dateKey(state.options.analysisStart):"",end:state?.options?.analysisEnd?dateKey(state.options.analysisEnd):""};
+    }
+    function lesson3DatesDirty() {
+      if(!state)return false;const p=lesson3ProcessedDates();
+      return ($("analysisStart")?.value||"")!==p.start || ($("analysisEnd")?.value||"")!==p.end;
+    }
+    function lesson3CaffeineSelection(scope) {
+      const roster=lesson3StudentClasses(),period=lesson3ProcessedDates(),records=[];
+      let unknownIncluded=0,unknownExcluded=0;
+      for(const row of state?.rawCaffeine||[]) {
+        const sid=idText(identityValue(row,["전체학번","학번","학생ID"]));
+        const klass=String(value(row,["반"])||roster.get(sid)||"");if(!lesson3ClassMatches(scope,klass))continue;
+        const amount=num(value(row,["함량","카페인(mg)","카페인mg","카페인"]));if(!(amount>0))continue;
+        const intake=parseDateTimeFlexible(value(row,["섭취시간","섭취 시간"]));
+        if(!intake){if(period.start||period.end)unknownExcluded++;else unknownIncluded++;continue;}
+        const day=dateKeyFlexible(intake);
+        if(period.start&&day<period.start||period.end&&day>period.end)continue;
+        records.push({intake,day,amount});
+      }
+      return {records,unknownIncluded,unknownExcluded,dateRange:dateRangeText(records.map(r=>r.day))};
+    }
+    function lesson3PeriodEvidence(scope) {
+      const p=lesson3ProcessedDates(),rows=classDailyRows(scope),selection=lesson3CaffeineSelection(scope);
+      const requested=scope===LESSON3_ALL?["1","2","3","4"]:scope?[String(scope)]:lesson3AvailableClasses();
+      const sourceClasses=lesson3SourceClasses().filter(c=>lesson3ClassMatches(scope,c));
+      const analysisClasses=[...new Set(rows.map(r=>String(r.반)))].sort((a,b)=>Number(a)-Number(b)||a.localeCompare(b));
+      return {...p,selected:p.start||p.end?`${p.start||"전체 시작"} ~ ${p.end||"전체 종료"}`:"전체 업로드 유효 기간 (날짜 제한 없음)",sleepRange:dateRangeText(rows.map(r=>r.분석일).filter(Boolean)),caffeineRange:selection.dateRange,unknownIntakeExcluded:selection.unknownExcluded,unknownIntakeIncluded:selection.unknownIncluded,sourceClasses,analysisClasses,missingSourceClasses:requested.filter(c=>!sourceClasses.includes(c)),noAnalysisClasses:requested.filter(c=>!analysisClasses.includes(c))};
+    }
+    function lesson3PeriodHtml(m) {
+      const p=m.period,show=s=>escapeHtml(s||"해당 자료 없음");
+      return `<div class="lesson3-reference"><strong>선택 기간: ${show(p.selected)}</strong><p>실제 수면 분석일: ${show(p.sleepRange)}<br>카페인 시간대 그래프의 실제 섭취일: ${show(p.caffeineRange||(p.unknownIntakeIncluded?"섭취일 확인 불가 · 시간 미상 "+p.unknownIntakeIncluded+"건":""))}</p><p>수면 분석일은 기상일 전날입니다. 산점도에 연결하는 카페인은 취침 직전 24시간이며, 카페인 시간대 막대는 섭취일 기준으로 선택 기간을 적용합니다. 날짜를 비우면 전체 업로드 유효 기간을 사용합니다. 날짜 변경 후에는 전처리를 다시 실행하세요.</p><p>원기록 확인 반: ${show(p.sourceClasses.map(c=>c+"반").join(" · "))} / 수면 분석 자료가 있는 반: ${show(p.analysisClasses.map(c=>c+"반").join(" · "))}${p.missingSourceClasses.length?"<br>원기록이 없는 반: "+escapeHtml(p.missingSourceClasses.map(c=>c+"반").join(" · "))+" — 미업로드 여부를 확인하세요.":""}${p.noAnalysisClasses.length?"<br>수면 분석 자료가 없는 반: "+escapeHtml(p.noAnalysisClasses.map(c=>c+"반").join(" · "))+" — 선택 기간의 유효 기록이 없을 수 있습니다.":""}</p>${p.unknownIntakeExcluded?`<p>섭취일 미상 ${p.unknownIntakeExcluded}건은 선택 기간에 속하는지 판단할 수 없어 카페인 시간대 막대에서 제외했습니다.</p>`:""}<p>학생별 평균 카페인량과 평균 컨디션은 각각 결측을 제외하므로 서로 다른 유효 날짜와 일수로 계산될 수 있습니다. 미기록을 0으로 바꾸지 않습니다.</p></div>`;
+    }
+
     function classDailyRows(klass) {
-      return state.studentAnalysis.filter(row => !klass || String(row.반) === String(klass));
+      return state.studentAnalysis.filter(row => lesson3ClassMatches(klass,row.반));
     }
 
     function setTabColor(ws, rgb = "FFFFFF00") {
@@ -1362,21 +1429,9 @@ var SleepRecordPolicy = (function () {
     }
 
     function caffeineTimeRows(klass) {
-      const counts = new Map();
-      const classByStudent = new Map((state?.rawStudents || []).map(row => [
-        idText(identityValue(row, ["전체학번", "학번", "학생ID", "id"])), String(value(row, ["반"]))
-      ]));
-      (state?.rawCaffeine || []).forEach(row => {
-        const sid = idText(identityValue(row, ["전체학번", "학번", "학생ID"]));
-        const rowClass = String(value(row, ["반"]) || classByStudent.get(sid) || "");
-        if (klass && rowClass !== String(klass)) return;
-        const amount = num(value(row, ["함량", "카페인(mg)", "카페인mg", "카페인"]));
-        const intake = parseDateTimeFlexible(value(row, ["섭취시간", "섭취 시간"]));
-        if (!(amount > 0) || !intake) return;
-        const band = caffeineTimeBand(intake.getHours());
-        counts.set(band, (counts.get(band) || 0) + 1);
-      });
-      return ["오전", "점심 전후", "오후", "저녁", "밤", "시간 미상"].map(band => ({ 시간대: band, 섭취횟수: counts.get(band) || 0 }));
+      const selected=lesson3CaffeineSelection(klass),counts=new Map();
+      selected.records.forEach(record=>{const band=caffeineTimeBand(record.intake.getHours());counts.set(band,(counts.get(band)||0)+1);});
+      return ["오전","점심 전후","오후","저녁","밤","시간 미상"].map(band=>({시간대:band,섭취횟수:band==="시간 미상"?selected.unknownIncluded:counts.get(band)||0}));
     }
 
     function knownCaffeineValue(row){
@@ -2377,12 +2432,18 @@ function researchCaffeineSheets(source, period) {
     function updateLessonDownloadButtons() {
       const classes = new Set((state?.analysis || []).map(row => String(row.반 ?? "")).filter(Boolean));
       const classReady = !!state && !state.identityWarnings?.length;
+      const lessonClasses = new Set(lesson3AvailableClasses());
+      const selectedLessonClass = $("classSelect")?.value;
+      const lessonSelectionReady = selectedLessonClass===LESSON3_ALL || lessonClasses.has(selectedLessonClass);
+      const lessonDatesDirty = lesson3DatesDirty();
+      const lessonIdentityProblem = !!state && !!selectedLessonClass && lesson3ScopeIdentityProblem(selectedLessonClass);
+      if ($("lesson3PeriodHint")) $("lesson3PeriodHint").textContent = lessonIdentityProblem ? "선택 범위의 학생정보에 학번은 같지만 반·이름 등 식별정보가 다른 중복이 있습니다. 확인 후 전처리를 다시 실행하세요." : lessonDatesDirty ? "분석 날짜가 변경되었습니다. 전처리를 다시 실행해야 새 기간이 반영됩니다." : "날짜를 비우면 전체 업로드 유효 기간 · 날짜 변경 후 전처리 재실행 · 전체는 1~4반의 학생 자료를 합칩니다.";
       const klass = $("classForStudent")?.value || "";
       const students = state ? studentOptionsForClass(klass) : [];
       const zipStudents = state ? studentOptionsForClass(klass, !!$("includeExampleStudent")?.checked) : [];
-      if ($("downloadByClass")) $("downloadByClass").disabled = !classReady || lessonExportBusy.classes || !classes.has($("classSelect")?.value);
-      if ($("downloadAllClass")) $("downloadAllClass").disabled = !classReady || lessonExportBusy.classes || !classes.size;
-      if ($("showLesson3Examples")) $("showLesson3Examples").disabled = !classReady || !classes.has($("classSelect")?.value);
+      if ($("downloadByClass")) $("downloadByClass").disabled = !classReady || lessonExportBusy.classes || lessonDatesDirty || lessonIdentityProblem || !lessonSelectionReady;
+      if ($("downloadAllClass")) $("downloadAllClass").disabled = !classReady || lessonExportBusy.classes || lessonDatesDirty || !classes.size;
+      if ($("showLesson3Examples")) $("showLesson3Examples").disabled = !classReady || lessonDatesDirty || lessonIdentityProblem || !lessonSelectionReady;
       if ($("downloadOneStudent")) $("downloadOneStudent").disabled = !state || lessonExportBusy.students
         || !students.some(row => row.익명ID === $("studentSelect")?.value);
       if ($("downloadAllStudents")) $("downloadAllStudents").disabled = !state || lessonExportBusy.students
@@ -2398,17 +2459,18 @@ function researchCaffeineSheets(source, period) {
         if (!sel) return;
         const prev = sel.value;
         const label = id === "classSelectTree" ? "전체" : ((id === "classForStudent" || id === "classForCheck") ? "전체 학생" : "반 선택");
-        const options = id === "classForCheck"
+        const options = id === "classSelect" ? lesson3AvailableClasses() : id === "classForCheck"
           ? [...new Set(dataCheckStudentOptions("", false).map(row => String(row.반)))].filter(Boolean).sort()
           : classes;
         sel.innerHTML = '<option value="">' + label + ' (' + options.length + '개 반)</option>';
+        if (id === "classSelect") { const allOption = document.createElement("option"); allOption.value = LESSON3_ALL; allOption.textContent = "전체(1~4반)"; sel.appendChild(allOption); }
         options.forEach(c => {
           const opt = document.createElement("option");
           opt.value = c;
           opt.textContent = c + "반";
           sel.appendChild(opt);
         });
-        sel.value = options.includes(prev) ? prev : "";
+        sel.value = options.includes(prev) || id === "classSelect" && prev === LESSON3_ALL ? prev : "";
       });
 
       populateStudentSelect();
@@ -2927,6 +2989,7 @@ function researchCaffeineSheets(source, period) {
 
     function buildClassVisualizationWorkbook(klass = "") {
       if (!requireResolvedIdentity()) return null;
+      if (lesson3ScopeIdentityProblem(klass)) { alert("선택 범위의 중복 학번에 식별정보 충돌이 있습니다. 학생정보를 확인한 뒤 전처리를 다시 실행해주세요."); return null; }
       const wb = XLSX.utils.book_new();
       // Bucket from the same student/day records as the scatter plot, before display rounding.
       const meanGroups = groupBy(classDailyRows(klass), ["익명ID"]);
@@ -2939,15 +3002,7 @@ function researchCaffeineSheets(source, period) {
       const missingMeans = sleepMeans.length - validMeans.length;
       if (bucketTotal !== validMeans.length || bucketTotal + missingMeans !== meanGroups.length) throw new Error("수면 평균 구간별 학생 수 검증에 실패했습니다.");
 
-      const classByStudent = new Map((state.rawStudents || []).map(row => [
-        idText(identityValue(row, ["전체학번", "학번", "학생ID", "id"])), String(value(row, ["반"]))
-      ]));
-      const unknownIntakeCount = (state.rawCaffeine || []).filter(row => {
-        const sid = idText(identityValue(row, ["전체학번", "학번", "학생ID"]));
-        const rowClass = String(value(row, ["반"]) || classByStudent.get(sid) || "");
-        return (!klass || rowClass === String(klass)) && num(value(row, ["함량", "카페인(mg)", "카페인mg", "카페인"])) > 0
-          && !parseDateTimeFlexible(value(row, ["섭취시간", "섭취 시간"]));
-      }).length;
+      const unknownIntakeCount = lesson3CaffeineSelection(klass).unknownIncluded;
       const timeRows = caffeineTimeRows(klass).slice(0, 5).map(row => ({ 시간대: row.시간대, "섭취 기록 수(건)": row.섭취횟수 }));
       if (unknownIntakeCount) timeRows.push({ 시간대: "시간 미상", "섭취 기록 수(건)": unknownIntakeCount });
       const timeRange = unknownIntakeCount ? "A1:B7" : "A1:B6";
@@ -3029,15 +3084,18 @@ function researchCaffeineSheets(source, period) {
       return { known, unknown:rows.filter(r=>r.label==="시간 미상").reduce((s,r)=>s+r.count,0), max, labels:max?knownRows.filter(r=>r.count===max).map(r=>r.label):[] };
     }
     function lesson3ExampleModel(klass) {
-      if (!state || state.identityWarnings?.length || !klass || !(state.analysis||[]).some(r=>String(r.반)===String(klass))) throw new Error("현재 전처리 자료에 있는 반을 선택해주세요.");
+      if(!state)throw new Error("먼저 전처리를 실행해주세요.");
+      if(state.identityWarnings?.length)throw new Error("학생 식별 정보 충돌을 확인한 뒤 전처리를 다시 실행해주세요.");
+      if(lesson3ScopeIdentityProblem(klass))throw new Error("선택 범위에 중복 학번의 반·이름 등 식별정보 충돌이 있습니다. 학생정보를 확인한 뒤 전처리를 다시 실행해주세요.");
+      if(lesson3DatesDirty())throw new Error("분석 날짜가 변경되었습니다. 전처리를 다시 실행해주세요.");
+      if(!klass || klass!==LESSON3_ALL&&!lesson3AvailableClasses().includes(String(klass)))throw new Error("현재 자료에 있는 반 또는 전체(1~4반)를 선택해주세요.");
       const wb=buildClassVisualizationWorkbook(String(klass));
       const data=name=>XLSX.utils.sheet_to_json(wb.Sheets[name],{defval:"",raw:true});
       const counts=(name,label,count)=>data(name).filter(r=>typeof r[count]==="number"&&Number.isFinite(r[count])).map(r=>({label:String(r[label]),count:r[count]}));
       const scatter=data("🟡그래프용_산점도");
-      // Whitelist numeric coordinates only: do not retain names, codes or anonymous IDs.
       const pairs=scatter.filter(r=>typeof r.평균카페인량==="number"&&Number.isFinite(r.평균카페인량)&&typeof r.평균수면컨디션점수==="number"&&Number.isFinite(r.평균수면컨디션점수)).map(r=>({x:r.평균카페인량,y:r.평균수면컨디션점수}));
       const sleepSheet=wb.Sheets["수면평균_구간별"];
-      return { klass:String(klass), timeRows:counts("카페인_시간대별","시간대","섭취 기록 수(건)"), bedRows:counts("취침시간_분포","취침시간대","기록수"), wakeRows:counts("기상시간_분포","기상시간대","기록수"), sleepRows:counts("수면평균_구간별","수면평균구간","학생수").slice(0,4), sleepValid:sleepSheet.E3.v, sleepMissing:sleepSheet.E4.v, studentCount:scatter.length, pairMissing:scatter.length-pairs.length, pairs, fit:lesson3LinearFit(pairs) };
+      return {klass:String(klass),label:lesson3ScopeLabel(klass),period:lesson3PeriodEvidence(klass),timeRows:counts("카페인_시간대별","시간대","섭취 기록 수(건)"),bedRows:counts("취침시간_분포","취침시간대","기록수"),wakeRows:counts("기상시간_분포","기상시간대","기록수"),sleepRows:counts("수면평균_구간별","수면평균구간","학생수").slice(0,4),sleepValid:sleepSheet.E3.v,sleepMissing:sleepSheet.E4.v,studentCount:scatter.length,pairMissing:scatter.length-pairs.length,pairs,fit:lesson3LinearFit(pairs)};
     }
     function lesson3ExampleAnswers(m) {
       const modeText=(rows,unit)=>{
@@ -3083,7 +3141,7 @@ function researchCaffeineSheets(source, period) {
       for(let i=0;i<=4;i++){const y=294-i*50;shapes+=`<line x1="70" y1="${y}" x2="770" y2="${y}" stroke="#e3e8ef"/><text x="58" y="${y+5}" text-anchor="end" font-size="13">${i*step}</text>`;}
       const stride=700/rows.length;
       rows.forEach((r,i)=>{const x=70+i*stride+stride*.15,w=stride*.7,h=200*r.count/top;shapes+=`<rect x="${x}" y="${294-h}" width="${w}" height="${h}" fill="${r.label==='시간 미상'?'#98a2b3':'#176b87'}"/><text x="${x+w/2}" y="${284-h}" text-anchor="middle" font-size="15">${r.count}</text><text x="${x+w/2}" y="323" text-anchor="middle" font-size="13">${escapeHtml(r.label)}</text>`;});
-      return lesson3Svg(title,`기록 수(건) · 총 ${total}건 · 시간 미상도 별도 범주로 표시`,shapes);
+      return lesson3Svg(title,`기록 수(건) · 총 ${total}건${rows.some(r=>r.label==="시간 미상")?" · 시간 미상은 별도 범주로 표시":""}`,shapes);
     }
     function lesson3PieSvg(m) {
       const colors=["#176b87","#38a89d","#d3a64a","#8567b7"],total=m.sleepValid;
@@ -3093,7 +3151,7 @@ function researchCaffeineSheets(source, period) {
         shapes+=`<rect x="365" y="${104+i*57}" width="15" height="15" fill="${colors[i]}"/><text x="389" y="${117+i*57}" font-size="15">${escapeHtml(r.label)}</text><text x="389" y="${138+i*57}" font-size="14" fill="#667085">${r.count}명${total?' · '+(100*r.count/total).toFixed(1)+'%':''}</text>`;
       });
       if(!total)shapes+='<text x="205" y="210" text-anchor="middle" font-size="17">유효 평균 없음</text>';
-      return lesson3Svg(m.klass+"반 — 평균 수면시간 구간",`학생수(명) · 유효 ${total}명 · 평균 결측 ${m.sleepMissing}명 · 반올림 전 평균으로 구간 판정`,shapes);
+      return lesson3Svg(m.label+" — 평균 수면시간 구간",`학생수(명) · 유효 ${total}명 · 평균 결측 ${m.sleepMissing}명 · 반올림 전 평균으로 구간 판정`,shapes);
     }
     function lesson3ScatterSvg(m) {
       const p=m.pairs,xmax=Math.max(1,...p.map(v=>v.x)),px=x=>75+650*x/xmax,py=y=>300-200*(y-1)/4;
@@ -3104,19 +3162,19 @@ function researchCaffeineSheets(source, period) {
       if(Number.isFinite(m.fit.slope)){const low=Math.min(...p.map(v=>v.x)),high=Math.max(...p.map(v=>v.x));shapes+=`<line x1="${px(low)}" y1="${py(m.fit.intercept+m.fit.slope*low)}" x2="${px(high)}" y2="${py(m.fit.intercept+m.fit.slope*high)}" stroke="#b54708" stroke-width="2.5" clip-path="url(#lesson3scatterClip)"/>`;}
       p.forEach(v=>{shapes+=`<circle cx="${px(v.x)}" cy="${py(v.y)}" r="5" fill="#176b87" opacity="0.7"><title>카페인 ${v.x}mg · 컨디션 ${v.y}점</title></circle>`;});
       if(!p.length)shapes+='<text x="400" y="210" text-anchor="middle" font-size="17">B–G 유효 짝 없음</text>';
-      return lesson3Svg(m.klass+"반 — 카페인량·컨디션 산점도",`학생별 평균의 유효 짝 ${p.length}명 · 짝 결측 ${m.pairMissing}명 · 같은 좌표의 점은 겹칠 수 있음`,shapes);
+      return lesson3Svg(m.label+" — 카페인량·컨디션 산점도",`학생별 평균의 유효 짝 ${p.length}명 · 짝 결측 ${m.pairMissing}명 · 같은 좌표의 점은 겹칠 수 있음`,shapes);
     }
     function lesson3ExampleCharts(m) {
       return [
-        {title:"카페인 시간대",svg:lesson3BarSvg(m.klass+"반 — 카페인 시간대",m.timeRows)},
-        {title:"취침시간 분포",svg:lesson3BarSvg(m.klass+"반 — 취침시간 분포",m.bedRows)},
-        {title:"기상시간 분포",svg:lesson3BarSvg(m.klass+"반 — 기상시간 분포",m.wakeRows)},
+        {title:"카페인 시간대",svg:lesson3BarSvg(m.label+" — 카페인 시간대",m.timeRows)},
+        {title:"취침시간 분포",svg:lesson3BarSvg(m.label+" — 취침시간 분포",m.bedRows)},
+        {title:"기상시간 분포",svg:lesson3BarSvg(m.label+" — 기상시간 분포",m.wakeRows)},
         {title:"평균 수면시간 구간",svg:lesson3PieSvg(m)},
         {title:"카페인량·컨디션 산점도",svg:lesson3ScatterSvg(m)}
       ];
     }
     function lesson3ExampleBody(s,interactive=false) {
-      return `<h2>${escapeHtml(s.model.klass)}반 · 3차시 그래프와 해석 예시</h2><p class="lesson3-reference">교사용 참고 예시이며 유일한 정답이 아닙니다. 학생은 먼저 직접 그래프와 답안을 작성한 뒤 비교합니다. 실제 선택 반의 현재 자료로 브라우저에서 계산했습니다.</p><p>산점도의 X는 B열 평균카페인량, Y는 G열 평균수면컨디션점수입니다. F열 수면시간이 Y축이 아닙니다. 원형그래프의 분모는 유효 평균 학생수이며 막대는 기록 수(건)입니다.</p>${interactive?'<button type="button" class="secondary" onclick="downloadLesson3ExampleHtml()">교사용 HTML 저장 · 인쇄용</button>':'<p>이 파일은 오프라인으로 열 수 있습니다. Ctrl+P 또는 브라우저 인쇄에서 PDF 저장을 선택하세요.</p>'}<div class="lesson3-graphs">${s.charts.map((c,i)=>`<figure>${c.svg}${interactive?`<figcaption><button type="button" class="secondary" onclick="downloadLesson3Chart(${i})">${escapeHtml(c.title)} PNG 저장</button></figcaption>`:''}</figure>`).join('')}</div><div class="lesson3-answers">${s.answers.map(a=>`<section><h3>${escapeHtml(a.q)}</h3><p>${escapeHtml(a.answer)}</p></section>`).join('')}</div>`;
+      return `<h2>${escapeHtml(s.model.label)} · 3차시 그래프와 해석 예시</h2>${lesson3PeriodHtml(s.model)}<p class="lesson3-reference">교사용 참고 예시이며 유일한 정답이 아닙니다. 학생은 먼저 직접 그래프와 답안을 작성한 뒤 비교합니다. 실제 선택 범위의 현재 자료로 브라우저에서 계산했습니다.</p><p>산점도의 X는 B열 평균카페인량, Y는 G열 평균수면컨디션점수입니다. F열 수면시간이 Y축이 아닙니다. 원형그래프의 분모는 유효 평균 학생수이며 막대는 기록 수(건)입니다.</p>${interactive?'<button type="button" class="secondary" onclick="downloadLesson3ExampleHtml()">교사용 HTML 저장 · 인쇄용</button>':'<p>이 파일은 오프라인으로 열 수 있습니다. Ctrl+P 또는 브라우저 인쇄에서 PDF 저장을 선택하세요.</p>'}<div class="lesson3-graphs">${s.charts.map((c,i)=>`<figure>${c.svg}${interactive?`<figcaption><button type="button" class="secondary" onclick="downloadLesson3Chart(${i})">${escapeHtml(c.title)} PNG 저장</button></figcaption>`:''}</figure>`).join('')}</div><div class="lesson3-answers">${s.answers.map(a=>`<section><h3>${escapeHtml(a.q)}</h3><p>${escapeHtml(a.answer)}</p></section>`).join('')}</div>`;
     }
     function drawLesson3Examples() {
       clearLesson3Examples();
@@ -3130,18 +3188,18 @@ function researchCaffeineSheets(source, period) {
     }
     function currentLesson3Example() {
       const s=lesson3ExampleState;
-      if(!s||!state||s.revision!==processingRevision||s.model.klass!==$("classSelect").value){clearLesson3Examples();return null;}
+      if(!s||!state||lesson3DatesDirty()||s.revision!==processingRevision||s.model.klass!==$("classSelect").value){clearLesson3Examples();return null;}
       return s;
     }
     function lesson3ExampleReport(s) {
-      return `<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escapeHtml(s.model.klass)}반 3차시 교사용 참고 예시</title><style>body{font-family:Segoe UI,Noto Sans KR,sans-serif;color:#172033;max-width:980px;margin:24px auto;padding:0 16px;line-height:1.65}figure{margin:16px 0;border:1px solid #d8dee9;padding:12px}svg{width:100%;height:auto}.lesson3-reference{background:#fff4d6;padding:12px}.lesson3-answers section{border-top:1px solid #d8dee9;padding:8px 0}h3{color:#176b87}@media print{body{margin:0;max-width:none;font-size:10pt}figure,.lesson3-answers section{break-inside:avoid}svg{max-height:88mm}h2,h3{break-after:avoid}}</style></head><body>${lesson3ExampleBody(s)}</body></html>`;
+      return `<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escapeHtml(s.model.label)} 3차시 교사용 참고 예시</title><style>body{font-family:Segoe UI,Noto Sans KR,sans-serif;color:#172033;max-width:980px;margin:24px auto;padding:0 16px;line-height:1.65}figure{margin:16px 0;border:1px solid #d8dee9;padding:12px}svg{width:100%;height:auto}.lesson3-reference{background:#fff4d6;padding:12px}.lesson3-answers section{border-top:1px solid #d8dee9;padding:8px 0}h3{color:#176b87}@media print{body{margin:0;max-width:none;font-size:10pt}figure,.lesson3-answers section{break-inside:avoid}svg{max-height:88mm}h2,h3{break-after:avoid}}</style></head><body>${lesson3ExampleBody(s)}</body></html>`;
     }
     function saveLesson3Blob(blob,name) {
       const url=URL.createObjectURL(blob),a=document.createElement("a");a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
     }
     function downloadLesson3ExampleHtml() {
       const s=currentLesson3Example();if(!s)return;
-      saveLesson3Blob(new Blob([lesson3ExampleReport(s)],{type:"text/html;charset=utf-8"}),`3차시_${safeFileName(s.model.klass)}반_교사용_그래프와해석예시.html`);
+      saveLesson3Blob(new Blob([lesson3ExampleReport(s)],{type:"text/html;charset=utf-8"}),`3차시_${safeFileName(s.model.label)}_교사용_그래프와해석예시.html`);
     }
     async function downloadLesson3Chart(index) {
       const s=currentLesson3Example();if(!s||!s.charts[index])return;
@@ -3152,7 +3210,7 @@ function researchCaffeineSheets(source, period) {
         const canvas=document.createElement("canvas");canvas.width=1600;canvas.height=760;
         const ctx=canvas.getContext("2d");ctx.fillStyle="#ffffff";ctx.fillRect(0,0,1600,760);ctx.drawImage(img,0,0,1600,760);
         const blob=await new Promise(resolve=>canvas.toBlob(resolve,"image/png"));
-        if(blob&&currentLesson3Example()===s)saveLesson3Blob(blob,`3차시_${safeFileName(s.model.klass)}반_${index+1}_${safeFileName(s.charts[index].title)}.png`);
+        if(blob&&currentLesson3Example()===s)saveLesson3Blob(blob,`3차시_${safeFileName(s.model.label)}_${index+1}_${safeFileName(s.charts[index].title)}.png`);
       } catch(error) { if(currentLesson3Example()===s)alert(error.message); } finally { URL.revokeObjectURL(url); }
     }
 
@@ -3272,22 +3330,23 @@ function researchCaffeineSheets(source, period) {
 
     // ─── 반별 다운로드 ────────────────────────────────────────────────
     function downloadByClass() {
-      const klass = $("classSelect").value;
-      if (!klass) { alert("반을 선택해주세요."); return; }
-      const wb = buildClassVisualizationWorkbook(klass);
-      if (!wb) return;
-      XLSX.writeFile(wb, "3차시_반별활동지_" + klass + "반.xlsx");
+      const klass=$("classSelect").value;
+      if(!klass){alert("반을 선택해주세요.");return;}
+      if(lesson3DatesDirty()){alert("분석 날짜가 변경되었습니다. 전처리를 다시 실행해주세요.");return;}
+      const wb=buildClassVisualizationWorkbook(klass);if(!wb)return;
+      XLSX.writeFile(wb,"3차시_반별활동지_"+safeFileName(lesson3ScopeLabel(klass))+".xlsx");
     }
 
     async function downloadAllClass() {
       if (!requireResolvedIdentity()) return;
+      if (lesson3DatesDirty()) { alert("분석 날짜가 변경되었습니다. 전처리를 다시 실행해주세요."); return; }
       const classes = [...new Set(state.analysis.map(row => String(row.반)))].filter(Boolean).sort();
       const exportRevision = processingRevision;
       lessonExportBusy.classes = true;
       updateLessonDownloadButtons();
       try {
         for (const klass of classes) {
-          if (exportRevision !== processingRevision) return;
+          if (exportRevision !== processingRevision || lesson3DatesDirty()) return;
           const wb = buildClassVisualizationWorkbook(klass);
           if (wb) XLSX.writeFile(wb, "3차시_반별활동지_" + klass + "반.xlsx");
           await new Promise(resolve => setTimeout(resolve, 120));
@@ -4470,6 +4529,7 @@ function researchCaffeineSheets(source, period) {
     $("classForStudent").addEventListener("change", populateStudentSelect);
     $("classSelect").addEventListener("change", () => { clearLesson3Examples(); updateLessonDownloadButtons(); });
     $("showLesson3Examples").addEventListener("click", drawLesson3Examples);
+    ["analysisStart","analysisEnd"].forEach(id => ["input","change"].forEach(event => $(id).addEventListener(event, () => { clearLesson3Examples(); updateLessonDownloadButtons(); })));
     $("studentSelect").addEventListener("change", updateLessonDownloadButtons);
     $("includeExampleStudent").addEventListener("change", updateLessonDownloadButtons);
     $("classForCheck").addEventListener("change", populateDataCheckStudentSelect);
