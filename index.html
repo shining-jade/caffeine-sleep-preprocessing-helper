@@ -359,13 +359,14 @@
     .example-zip-choice { display: inline-flex; align-items: center; gap: 6px; margin: 0; font-size: 12px; font-weight: 500; }
     input[type="checkbox"] { width: 16px; height: 16px; min-height: 0; padding: 0; margin: 0; flex: 0 0 16px; }
     .checkbox-choice, .example-zip-choice { display: inline-flex; align-items: center; gap: 6px; min-height: 40px; }
+    .lesson3-graphs{display:grid;gap:14px;margin-top:16px}.lesson3-graphs figure{margin:0;border:1px solid var(--line);border-radius:8px;background:#fff;padding:10px}.lesson3-graphs svg{width:100%;height:auto;display:block}.lesson3-graphs figcaption{padding-top:8px}.lesson3-answers{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-top:18px}.lesson3-answers section{border:1px solid var(--line);border-radius:8px;background:#fff;padding:14px}.lesson3-answers h3{font-size:15px;color:var(--brand);margin:0 0 8px}.lesson3-answers p,#lesson3ExamplePanel>p{font-size:14px;line-height:1.65}.lesson3-reference{background:#fffaeb;border:1px solid #fedf89;padding:12px;border-radius:8px}@media(max-width:700px){.lesson3-answers{grid-template-columns:1fr}}
   </style>
 </head>
 <body>
   <header>
     <h1>교사용 카페인·수면 분석자료 생성기 v73</h1>
     <p>교사가 카페인·수면 원자료를 넣으면, 학생 활동에 사용할 반별·개인별 분석 데이터와 AI 분석용 CSV를 자동 생성합니다.</p>
-    <p id="publication-update">최근 반영: 2026-10-25T14:14:02Z (UTC). 3차시 학생용 파일을 6개 탭으로 정리하고 수면 평균 구간표를 추가했습니다. 최신 화면이 보이지 않으면 파일 선택 전에 Ctrl+F5로 새로고침하세요.</p>
+    <p id="publication-update">최근 반영: 2026-10-26T07:59:54Z (UTC). 3차시 선택 반의 그래프 5개와 Q1~8 교사용 해석 예시·PNG/HTML 저장을 추가했습니다. 최신 화면이 보이지 않으면 파일 선택 전에 Ctrl+F5로 새로고침하세요.</p>
   </header>
 
   <main>
@@ -461,8 +462,10 @@
               <select id="classSelect"><option value="">반 선택</option></select>
               <button id="downloadByClass" class="secondary">📥 3차시용 선택 반 활동지</button>
               <button id="downloadAllClass" class="secondary">📥 전체 반 활동지 일괄 생성</button>
+              <button id="showLesson3Examples" class="secondary" disabled>📊 3차시 반별 모범답안 보기</button>
             </div>
           </div>
+          <div id="lesson3ExamplePanel" style="display:none;padding:18px;"></div>
           <div class="dl-row">
             <span class="dl-label">[4차시] 개인 데이터 + 반별 분석</span>
             <div class="dl-controls">
@@ -2379,6 +2382,7 @@ function researchCaffeineSheets(source, period) {
       const zipStudents = state ? studentOptionsForClass(klass, !!$("includeExampleStudent")?.checked) : [];
       if ($("downloadByClass")) $("downloadByClass").disabled = !classReady || lessonExportBusy.classes || !classes.has($("classSelect")?.value);
       if ($("downloadAllClass")) $("downloadAllClass").disabled = !classReady || lessonExportBusy.classes || !classes.size;
+      if ($("showLesson3Examples")) $("showLesson3Examples").disabled = !classReady || !classes.has($("classSelect")?.value);
       if ($("downloadOneStudent")) $("downloadOneStudent").disabled = !state || lessonExportBusy.students
         || !students.some(row => row.익명ID === $("studentSelect")?.value);
       if ($("downloadAllStudents")) $("downloadAllStudents").disabled = !state || lessonExportBusy.students
@@ -3000,6 +3004,158 @@ function researchCaffeineSheets(source, period) {
       return wb;
     }
 
+    // Teacher-only lesson 3 examples. All calculations stay inside this browser.
+    let lesson3ExampleState = null;
+    function clearLesson3Examples() {
+      lesson3ExampleState = null;
+      const panel = $("lesson3ExamplePanel");
+      if (panel) { panel.innerHTML = ""; panel.style.display = "none"; }
+    }
+    function lesson3LinearFit(pairs) {
+      const n = pairs.length;
+      if (n < 2) return { n, slope: null, intercept: null, r2: null, reason: "insufficient" };
+      if (pairs.every(p=>p.x===pairs[0].x)) return { n, slope:null, intercept:null, r2:null, reason:"constant-x" };
+      if (pairs.every(p=>p.y===pairs[0].y)) return { n, slope:0, intercept:pairs[0].y, r2:null, reason:"constant-y" };
+      const mx = pairs.reduce((s,p)=>s+p.x,0)/n, my = pairs.reduce((s,p)=>s+p.y,0)/n;
+      let xx=0, yy=0, xy=0;
+      pairs.forEach(p=>{ xx+=(p.x-mx)**2; yy+=(p.y-my)**2; xy+=(p.x-mx)*(p.y-my); });
+      if (xx === 0) return { n, slope: null, intercept: null, r2: null, reason: "constant-x" };
+      const slope=xy/xx;
+      return { n, slope, intercept:my-slope*mx, r2:yy===0?null:Math.max(0,Math.min(1,xy*xy/(xx*yy))), reason:yy===0?"constant-y":"ok" };
+    }
+    function lesson3Mode(rows) {
+      const knownRows=rows.filter(r=>r.label!=="시간 미상"), known=knownRows.reduce((s,r)=>s+r.count,0);
+      const max=Math.max(0,...knownRows.map(r=>r.count));
+      return { known, unknown:rows.filter(r=>r.label==="시간 미상").reduce((s,r)=>s+r.count,0), max, labels:max?knownRows.filter(r=>r.count===max).map(r=>r.label):[] };
+    }
+    function lesson3ExampleModel(klass) {
+      if (!state || state.identityWarnings?.length || !klass || !(state.analysis||[]).some(r=>String(r.반)===String(klass))) throw new Error("현재 전처리 자료에 있는 반을 선택해주세요.");
+      const wb=buildClassVisualizationWorkbook(String(klass));
+      const data=name=>XLSX.utils.sheet_to_json(wb.Sheets[name],{defval:"",raw:true});
+      const counts=(name,label,count)=>data(name).filter(r=>typeof r[count]==="number"&&Number.isFinite(r[count])).map(r=>({label:String(r[label]),count:r[count]}));
+      const scatter=data("🟡그래프용_산점도");
+      // Whitelist numeric coordinates only: do not retain names, codes or anonymous IDs.
+      const pairs=scatter.filter(r=>typeof r.평균카페인량==="number"&&Number.isFinite(r.평균카페인량)&&typeof r.평균수면컨디션점수==="number"&&Number.isFinite(r.평균수면컨디션점수)).map(r=>({x:r.평균카페인량,y:r.평균수면컨디션점수}));
+      const sleepSheet=wb.Sheets["수면평균_구간별"];
+      return { klass:String(klass), timeRows:counts("카페인_시간대별","시간대","섭취 기록 수(건)"), bedRows:counts("취침시간_분포","취침시간대","기록수"), wakeRows:counts("기상시간_분포","기상시간대","기록수"), sleepRows:counts("수면평균_구간별","수면평균구간","학생수").slice(0,4), sleepValid:sleepSheet.E3.v, sleepMissing:sleepSheet.E4.v, studentCount:scatter.length, pairMissing:scatter.length-pairs.length, pairs, fit:lesson3LinearFit(pairs) };
+    }
+    function lesson3ExampleAnswers(m) {
+      const modeText=(rows,unit)=>{
+        const a=lesson3Mode(rows);
+        if(!a.known)return `시간대가 확인된 유효 기록이 없어 최빈 시간대를 판단할 수 없습니다. 시간 미상 ${a.unknown}${unit}은 별도로 확인합니다.`;
+        return `${a.labels.join(" · ")}${a.labels.length>1?"(동률)":""}가 가장 많고 각각 ${a.max}${unit}입니다. 시간대 확인 기록 ${a.known}${unit} 중 ${(100*a.max/a.known).toFixed(1)}%이며, 시간 미상 ${a.unknown}${unit}은 이 비율의 분모에서 구분했습니다.`;
+      };
+      const time=modeText(m.timeRows,"건"),bed=modeText(m.bedRows,"건"),wake=modeText(m.wakeRows,"건");
+      const max=Math.max(0,...m.sleepRows.map(r=>r.count));
+      const largest=m.sleepRows.filter(r=>r.count===max&&max>0);
+      const sleep=m.sleepValid?`${largest.map(r=>r.label).join(" · ")}${largest.length>1?"(동률)":""} 구간이 가장 많습니다. 각각 ${max}명, 유효 평균이 있는 ${m.sleepValid}명 중 ${(100*max/m.sleepValid).toFixed(1)}%입니다. 평균 수면시간 결측 ${m.sleepMissing}명은 비율 분모에서 제외했습니다.`:`유효한 학생 평균 수면시간이 없어 최대 구간과 비율을 계산할 수 없습니다. 평균 결측은 ${m.sleepMissing}명입니다.`;
+      const f=m.fit;
+      let trend=f.reason==="insufficient"?`유효한 B–G 짝이 ${f.n}명이라 선형 추세선을 계산하지 않습니다.`:f.reason==="constant-x"?`유효한 ${f.n}명의 평균 카페인량이 모두 같아 X축 분산이 0입니다. 선형 추세선의 기울기와 R²를 정할 수 없습니다.`:f.reason==="constant-y"?`유효한 ${f.n}명의 평균 컨디션 점수가 모두 같아 추세선은 수평입니다. Y축 분산이 0이므로 R²는 표시하지 않습니다.`:`유효한 ${f.n}명에서 선형 추세선은 ${f.slope>0?"우상향":f.slope<0?"우하향":"수평"}입니다. R²=${f.r2.toFixed(2)}입니다. R²는 이 학생별 평균 자료에서 선 주변의 선형 흩어짐을 요약한 값이며 인과관계를 뜻하지 않습니다.`;
+      if(f.n===2&&f.reason==="ok")trend+=" 두 점만으로 그린 직선이므로 뚜렷한 일반적 경향의 근거로 삼기 어렵습니다.";
+      if(Number.isFinite(f.slope)){
+        const residuals=m.pairs.map(p=>Math.abs(p.y-(f.intercept+f.slope*p.x))), far=Math.max(...residuals);
+        trend+=far>1e-9?` 선에서 가장 멀리 떨어진 점의 세로 차이는 ${far.toFixed(2)}점입니다. 떨어진 점을 예외의 후보로 살펴보되 기록을 자동 제외하지 않습니다.`:" 점들이 계산된 선 위에 있지만 표본과 자료의 한계를 함께 봐야 합니다.";
+      }
+      trend+=` X는 B열 평균카페인량(mg), Y는 G열 평균수면컨디션점수(1~5)입니다. F열 수면시간이 Y축이 아닙니다. 0mg은 유효한 미섭취 기록이며 짝이 결측인 ${m.pairMissing}명은 0으로 채우지 않았습니다. 학생별 평균 관계를 같은 날의 원인·결과로 해석하지 않습니다.`;
+      const patterns=[];
+      if(lesson3Mode(m.timeRows).known)patterns.push("카페인 시간대: "+time);
+      if(lesson3Mode(m.bedRows).known)patterns.push("취침 분포: "+bed);
+      if(lesson3Mode(m.wakeRows).known)patterns.push("기상 분포: "+wake);
+      if(m.sleepValid)patterns.push("평균 수면 구간: "+sleep);
+      const selected=patterns.slice(0,2);
+      return [
+        {q:"Q1 사전 예상",answer:"사전 예상은 학생 개인의 생각이므로 정답을 판정하지 않습니다. 자신이 적었던 예상과 아래 실제 반별 결과를 비교하고, 같거나 달랐던 점을 설명합니다."},
+        {q:"Q2 카페인 시간대의 최빈과 비교",answer:time+" 이 막대는 함량이 확인된 양성 섭취 기록 수(건)입니다. 일별 여부 합계나 학생수와 같은 단위가 아닙니다. 유효한 0mg 미섭취는 평균 계산에 포함하지만 음료를 마신 건수로 세지 않습니다."},
+        {q:"Q3 취침·기상 최빈 시간대와 분포",answer:"취침: "+bed+" 기상: "+wake},
+        {q:"Q4 취침과 기상 분포 함께 해석",answer:"취침 분포에서는 "+bed+" 기상 분포에서는 "+wake+" 두 최빈 시간대의 차이를 평균 수면시간이라고 할 수 없습니다. 각 기록의 취침~기상 간격을 계산한 자료와 학생 평균 수면 구간을 함께 확인합니다."},
+        {q:"Q5 평균 수면 구간의 최대 비중",answer:sleep+" 구간 판단은 반올림 전 평균으로 하고 수면시간 표시는 소수 첫째 자리로 유지합니다. 8시간 이상 구간에는 더 긴 값도 포함되므로 이 구간 전체를 권장 범위 충족이라고 단정하지 않습니다."},
+        {q:"Q6 서로 다른 집계 단위",answer:"카페인 막대는 개별 섭취 기록 수(건), 취침·기상 막대는 수면 기록 수(건), 원그래프는 유효 평균이 있는 학생수(명), 산점도는 학생별 평균의 유효 짝(명)입니다. 한 학생이 여러 번·여러 날 기록할 수 있으므로 총수가 달라도 곧바로 오류는 아닙니다. 미기록을 숫자 0으로 대신하지 않습니다."},
+        {q:"Q7 산점도의 방향·흩어짐·예외",answer:trend},
+        {q:"Q8 관찰한 패턴 2가지와 한계 1가지",answer:(selected.length?selected.map((p,i)=>`패턴 ${i+1}: ${p}`).join(" "):"현재 유효 기록으로는 패턴을 제시할 수 없습니다.")+(selected.length<2?" 유효 정보가 부족해 패턴 2개를 억지로 채우지 않습니다.":"")+" 한계: 이 반의 기록된 기간에 대한 관찰자료입니다. 결측과 기록량 차이가 있으며 학생별 평균의 상관관계로 같은 날의 인과관계나 개인의 원인을 확정할 수 없습니다."}
+      ];
+    }
+    function lesson3Svg(title,subtitle,content) {
+      return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 380" width="800" height="380" role="img" aria-label="${escapeHtml(title)}"><rect width="800" height="380" fill="white"/><g font-family="Segoe UI, Noto Sans KR, sans-serif" fill="#172033"><text x="40" y="30" font-size="21" font-weight="700">${escapeHtml(title)}</text><text x="40" y="53" font-size="13" fill="#667085">${escapeHtml(subtitle)}</text>${content}</g></svg>`;
+    }
+    function lesson3BarSvg(title,rows) {
+      const max=Math.max(1,...rows.map(r=>r.count)),step=Math.max(1,Math.ceil(max/4)),top=step*4,total=rows.reduce((s,r)=>s+r.count,0);
+      let shapes="";
+      for(let i=0;i<=4;i++){const y=294-i*50;shapes+=`<line x1="70" y1="${y}" x2="770" y2="${y}" stroke="#e3e8ef"/><text x="58" y="${y+5}" text-anchor="end" font-size="13">${i*step}</text>`;}
+      const stride=700/rows.length;
+      rows.forEach((r,i)=>{const x=70+i*stride+stride*.15,w=stride*.7,h=200*r.count/top;shapes+=`<rect x="${x}" y="${294-h}" width="${w}" height="${h}" fill="${r.label==='시간 미상'?'#98a2b3':'#176b87'}"/><text x="${x+w/2}" y="${284-h}" text-anchor="middle" font-size="15">${r.count}</text><text x="${x+w/2}" y="323" text-anchor="middle" font-size="13">${escapeHtml(r.label)}</text>`;});
+      return lesson3Svg(title,`기록 수(건) · 총 ${total}건 · 시간 미상도 별도 범주로 표시`,shapes);
+    }
+    function lesson3PieSvg(m) {
+      const colors=["#176b87","#38a89d","#d3a64a","#8567b7"],total=m.sleepValid;
+      let angle=-Math.PI/2,shapes="";
+      m.sleepRows.forEach((r,i)=>{
+        if(total&&r.count){const end=angle+2*Math.PI*r.count/total,x1=205+110*Math.cos(angle),y1=210+110*Math.sin(angle),x2=205+110*Math.cos(end),y2=210+110*Math.sin(end);shapes+=r.count===total?`<circle cx="205" cy="210" r="110" fill="${colors[i]}"/>`:`<path d="M205,210 L${x1},${y1} A110,110 0 ${end-angle>Math.PI?1:0} 1 ${x2},${y2} Z" fill="${colors[i]}" stroke="white"/>`;angle=end;}
+        shapes+=`<rect x="365" y="${104+i*57}" width="15" height="15" fill="${colors[i]}"/><text x="389" y="${117+i*57}" font-size="15">${escapeHtml(r.label)}</text><text x="389" y="${138+i*57}" font-size="14" fill="#667085">${r.count}명${total?' · '+(100*r.count/total).toFixed(1)+'%':''}</text>`;
+      });
+      if(!total)shapes+='<text x="205" y="210" text-anchor="middle" font-size="17">유효 평균 없음</text>';
+      return lesson3Svg(m.klass+"반 — 평균 수면시간 구간",`학생수(명) · 유효 ${total}명 · 평균 결측 ${m.sleepMissing}명 · 반올림 전 평균으로 구간 판정`,shapes);
+    }
+    function lesson3ScatterSvg(m) {
+      const p=m.pairs,xmax=Math.max(1,...p.map(v=>v.x)),px=x=>75+650*x/xmax,py=y=>300-200*(y-1)/4;
+      let shapes='<defs><clipPath id="lesson3scatterClip"><rect x="75" y="90" width="650" height="210"/></clipPath></defs>';
+      for(let i=1;i<=5;i++)shapes+=`<line x1="75" y1="${py(i)}" x2="725" y2="${py(i)}" stroke="#e3e8ef"/><text x="63" y="${py(i)+5}" text-anchor="end" font-size="13">${i}</text>`;
+      for(let i=0;i<=4;i++)shapes+=`<text x="${px(xmax*i/4)}" y="322" text-anchor="middle" font-size="13">${(xmax*i/4).toFixed(1)}</text>`;
+      shapes+='<text x="80" y="81" font-size="14">Y · 평균수면컨디션점수 (G열, 1~5)</text><text x="400" y="354" text-anchor="middle" font-size="15">X · 평균카페인량 (B열, mg)</text>';
+      if(Number.isFinite(m.fit.slope)){const low=Math.min(...p.map(v=>v.x)),high=Math.max(...p.map(v=>v.x));shapes+=`<line x1="${px(low)}" y1="${py(m.fit.intercept+m.fit.slope*low)}" x2="${px(high)}" y2="${py(m.fit.intercept+m.fit.slope*high)}" stroke="#b54708" stroke-width="2.5" clip-path="url(#lesson3scatterClip)"/>`;}
+      p.forEach(v=>{shapes+=`<circle cx="${px(v.x)}" cy="${py(v.y)}" r="5" fill="#176b87" opacity="0.7"><title>카페인 ${v.x}mg · 컨디션 ${v.y}점</title></circle>`;});
+      if(!p.length)shapes+='<text x="400" y="210" text-anchor="middle" font-size="17">B–G 유효 짝 없음</text>';
+      return lesson3Svg(m.klass+"반 — 카페인량·컨디션 산점도",`학생별 평균의 유효 짝 ${p.length}명 · 짝 결측 ${m.pairMissing}명 · 같은 좌표의 점은 겹칠 수 있음`,shapes);
+    }
+    function lesson3ExampleCharts(m) {
+      return [
+        {title:"카페인 시간대",svg:lesson3BarSvg(m.klass+"반 — 카페인 시간대",m.timeRows)},
+        {title:"취침시간 분포",svg:lesson3BarSvg(m.klass+"반 — 취침시간 분포",m.bedRows)},
+        {title:"기상시간 분포",svg:lesson3BarSvg(m.klass+"반 — 기상시간 분포",m.wakeRows)},
+        {title:"평균 수면시간 구간",svg:lesson3PieSvg(m)},
+        {title:"카페인량·컨디션 산점도",svg:lesson3ScatterSvg(m)}
+      ];
+    }
+    function lesson3ExampleBody(s,interactive=false) {
+      return `<h2>${escapeHtml(s.model.klass)}반 · 3차시 그래프와 해석 예시</h2><p class="lesson3-reference">교사용 참고 예시이며 유일한 정답이 아닙니다. 학생은 먼저 직접 그래프와 답안을 작성한 뒤 비교합니다. 실제 선택 반의 현재 자료로 브라우저에서 계산했습니다.</p><p>산점도의 X는 B열 평균카페인량, Y는 G열 평균수면컨디션점수입니다. F열 수면시간이 Y축이 아닙니다. 원형그래프의 분모는 유효 평균 학생수이며 막대는 기록 수(건)입니다.</p>${interactive?'<button type="button" class="secondary" onclick="downloadLesson3ExampleHtml()">교사용 HTML 저장 · 인쇄용</button>':'<p>이 파일은 오프라인으로 열 수 있습니다. Ctrl+P 또는 브라우저 인쇄에서 PDF 저장을 선택하세요.</p>'}<div class="lesson3-graphs">${s.charts.map((c,i)=>`<figure>${c.svg}${interactive?`<figcaption><button type="button" class="secondary" onclick="downloadLesson3Chart(${i})">${escapeHtml(c.title)} PNG 저장</button></figcaption>`:''}</figure>`).join('')}</div><div class="lesson3-answers">${s.answers.map(a=>`<section><h3>${escapeHtml(a.q)}</h3><p>${escapeHtml(a.answer)}</p></section>`).join('')}</div>`;
+    }
+    function drawLesson3Examples() {
+      clearLesson3Examples();
+      if (!requireResolvedIdentity()) return;
+      const panel=$("lesson3ExamplePanel");
+      try {
+        const model=lesson3ExampleModel($("classSelect").value);
+        lesson3ExampleState={revision:processingRevision,model,answers:lesson3ExampleAnswers(model),charts:lesson3ExampleCharts(model)};
+        panel.innerHTML=lesson3ExampleBody(lesson3ExampleState,true);panel.style.display="block";
+      } catch(error) { panel.innerHTML=`<p>${escapeHtml(error.message)}</p>`;panel.style.display="block"; }
+    }
+    function currentLesson3Example() {
+      const s=lesson3ExampleState;
+      if(!s||!state||s.revision!==processingRevision||s.model.klass!==$("classSelect").value){clearLesson3Examples();return null;}
+      return s;
+    }
+    function lesson3ExampleReport(s) {
+      return `<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escapeHtml(s.model.klass)}반 3차시 교사용 참고 예시</title><style>body{font-family:Segoe UI,Noto Sans KR,sans-serif;color:#172033;max-width:980px;margin:24px auto;padding:0 16px;line-height:1.65}figure{margin:16px 0;border:1px solid #d8dee9;padding:12px}svg{width:100%;height:auto}.lesson3-reference{background:#fff4d6;padding:12px}.lesson3-answers section{border-top:1px solid #d8dee9;padding:8px 0}h3{color:#176b87}@media print{body{margin:0;max-width:none;font-size:10pt}figure,.lesson3-answers section{break-inside:avoid}svg{max-height:88mm}h2,h3{break-after:avoid}}</style></head><body>${lesson3ExampleBody(s)}</body></html>`;
+    }
+    function saveLesson3Blob(blob,name) {
+      const url=URL.createObjectURL(blob),a=document.createElement("a");a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
+    }
+    function downloadLesson3ExampleHtml() {
+      const s=currentLesson3Example();if(!s)return;
+      saveLesson3Blob(new Blob([lesson3ExampleReport(s)],{type:"text/html;charset=utf-8"}),`3차시_${safeFileName(s.model.klass)}반_교사용_그래프와해석예시.html`);
+    }
+    async function downloadLesson3Chart(index) {
+      const s=currentLesson3Example();if(!s||!s.charts[index])return;
+      const url=URL.createObjectURL(new Blob([s.charts[index].svg],{type:"image/svg+xml;charset=utf-8"}));
+      try {
+        const img=new Image();await new Promise((resolve,reject)=>{img.onload=resolve;img.onerror=()=>reject(new Error("그래프 이미지 변환 실패"));img.src=url;});
+        if(currentLesson3Example()!==s)return;
+        const canvas=document.createElement("canvas");canvas.width=1600;canvas.height=760;
+        const ctx=canvas.getContext("2d");ctx.fillStyle="#ffffff";ctx.fillRect(0,0,1600,760);ctx.drawImage(img,0,0,1600,760);
+        const blob=await new Promise(resolve=>canvas.toBlob(resolve,"image/png"));
+        if(blob&&currentLesson3Example()===s)saveLesson3Blob(blob,`3차시_${safeFileName(s.model.klass)}반_${index+1}_${safeFileName(s.charts[index].title)}.png`);
+      } catch(error) { if(currentLesson3Example()===s)alert(error.message); } finally { URL.revokeObjectURL(url); }
+    }
+
     function buildQualityWorkbook(klass) {
       if (!requireResolvedIdentity()) return null;
       const rows = classDailyRows(klass);
@@ -3295,13 +3451,14 @@ function researchCaffeineSheets(source, period) {
 
     function clearProcessedResults() {
       processingRevision += 1;
+      clearLesson3Examples();
       lessonExportBusy.classes = false;
       lessonExportBusy.students = false;
       if ($("progressWrap")) $("progressWrap").style.display = "none";
       if ($("progressBar")) $("progressBar").style.width = "0%";
       state = null;
       activeTab = "teacherAnalysis";
-      ["downloadTeacher", "downloadCsv", "downloadAiSummary", "treeDraw", "downloadByClass", "downloadAllClass",
+      ["showLesson3Examples", "downloadTeacher", "downloadCsv", "downloadAiSummary", "treeDraw", "downloadByClass", "downloadAllClass",
         "downloadOneStudent", "downloadAllStudents", "downloadTask", "downloadBeforeAfter", "downloadBeforeAfterOne",
         "downloadBeforeAfterZip", "downloadDataCheck", "downloadDataCheckZip", "downloadReview"].forEach(id => {
         if ($(id)) $(id).disabled = true;
@@ -4311,7 +4468,8 @@ function researchCaffeineSheets(source, period) {
 
     // 반 선택 시 학생 드롭다운 갱신
     $("classForStudent").addEventListener("change", populateStudentSelect);
-    $("classSelect").addEventListener("change", updateLessonDownloadButtons);
+    $("classSelect").addEventListener("change", () => { clearLesson3Examples(); updateLessonDownloadButtons(); });
+    $("showLesson3Examples").addEventListener("click", drawLesson3Examples);
     $("studentSelect").addEventListener("change", updateLessonDownloadButtons);
     $("includeExampleStudent").addEventListener("change", updateLessonDownloadButtons);
     $("classForCheck").addEventListener("change", populateDataCheckStudentSelect);
