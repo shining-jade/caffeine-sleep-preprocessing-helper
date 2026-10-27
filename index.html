@@ -366,7 +366,7 @@
   <header>
     <h1>교사용 카페인·수면 분석자료 생성기 v73</h1>
     <p>교사가 카페인·수면 원자료를 넣으면, 학생 활동에 사용할 반별·개인별 분석 데이터와 AI 분석용 CSV를 자동 생성합니다.</p>
-    <p id="publication-update">최근 반영: 2026-10-27T02:17:16Z (UTC). 선택 기간의 카페인 평균을 공통 mg 6구간으로 집계하는 학생 수 그래프와 Excel G1:H7 표를 추가했습니다. 미기록은 0mg과 구분하며, 기존 2차시 기간 파일명과 다른 그래프를 보존했습니다. 최신 화면이 보이지 않으면 파일 선택 전에 Ctrl+F5로 새로고침하세요.</p>
+    <p id="publication-update">최근 반영: 2026-10-27T10:56:35Z (UTC). 3차시 Excel의 그래프 선택 범위를 파란 외곽 테두리로 표시하고 안내를 추가했습니다. 값·계산과 6개 시트를 유지합니다. 최신 화면이 보이지 않으면 파일 선택 전에 Ctrl+F5로 새로고침한 뒤 전처리·다운로드를 다시 실행하세요.</p>
   </header>
 
   <main>
@@ -3095,6 +3095,25 @@ function researchCaffeineSheets(source, period) {
       return `4차시_개인별분석자료_${studentId}_${name}${suffix}${exampleSuffix(info)}.xlsx`;
     }
 
+    // Outside borders identify chart source cells; values and existing fills stay unchanged.
+    function lesson3OutlineGraphRange(ws,ref) {
+      const range=XLSX.utils.decode_range(ref);
+      for(let r=range.s.r;r<=range.e.r;r++)for(let c=range.s.c;c<=range.e.c;c++) {
+        const edges={};
+        for(const [edge,on] of [["top",r===range.s.r],["bottom",r===range.e.r],["left",c===range.s.c],["right",c===range.e.c]])if(on)edges[edge]={style:"medium",color:{rgb:"2F5597"}};
+        if(!Object.keys(edges).length)continue;
+        const address=XLSX.utils.encode_cell({r,c}),cell=ws[address]||(ws[address]={t:"s",v:""});
+        cell.s={...(cell.s||{}),border:{...(cell.s?.border||{}),...edges}};
+      }
+    }
+    function lesson3GraphSelectionNote(ws,address,text,width=36) {
+      XLSX.utils.sheet_add_aoa(ws,[[text]],{origin:address});
+      ws[address].s={font:{color:{rgb:"2F5597"}},alignment:{wrapText:true,vertical:"top"}};
+      const {r,c}=XLSX.utils.decode_cell(address);
+      ws["!cols"]=ws["!cols"]||[];ws["!cols"][c]={...(ws["!cols"][c]||{}),wch:width};
+      ws["!rows"]=ws["!rows"]||[];ws["!rows"][r]={...(ws["!rows"][r]||{}),hpt:72};
+    }
+
     function buildClassVisualizationWorkbook(klass = "") {
       if (!requireResolvedIdentity()) return null;
       if (lesson3ScopeIdentityProblem(klass)) { alert("선택 범위의 중복 학번에 식별정보 충돌이 있습니다. 학생정보를 확인한 뒤 전처리를 다시 실행해주세요."); return null; }
@@ -3120,7 +3139,7 @@ function researchCaffeineSheets(source, period) {
 
       appendSleepFormattedSheet(wb, XLSX.utils.json_to_sheet(oneColumnSheet([
         "[3차시] 우리 반 자료로 그래프 만들기",
-        "자기 반 파일의 6개 탭을 왼쪽부터 사용합니다. 준비된 집계표를 선택해 그래프를 만들고, 질문은 활동지에 답합니다.",
+        "자기 반 파일의 6개 탭을 왼쪽부터 사용합니다. 파란 외곽 테두리는 그래프 선택 범위입니다(입력칸이나 현재 선택 표시가 아님). 제목부터 마지막 데이터 행까지 선택하고, 합계·미기록 집계·설명문은 제외합니다. 질문은 활동지에 답합니다.",
         "[설명 1] 카페인 시간대 막대그래프",
         "카페인_시간대별 시트 " + timeRange + " 선택 → 막대/세로 막대그래프. X축: 시간대, Y축: 섭취 기록 수(건). 기본 범위는 A1:B7이며 여섯 시간대를 모두 선택합니다.",
         "이 표는 함량이 0mg보다 큰 개별 섭취 기록 수입니다. 오전·오후·저녁의 일별 여부 합계는 섭취한 날 수이므로 섭취 기록 수(건)와 다릅니다.",
@@ -3129,10 +3148,10 @@ function researchCaffeineSheets(source, period) {
         unknownIntakeCount ? "시간 확인 불가 " + unknownIntakeCount + "건 제외: 원자료는 보존하고 A1:B7 그래프에는 포함하지 않습니다. D13:E14의 제외 안내를 확인합니다. 섭취일도 미상이면 선택 기간 포함 여부를 판단할 수 없습니다." : "섭취 시각을 확인할 수 없는 기록은 원자료에 보존하고 A1:B7 그래프 범위에서는 제외합니다.",
         "[질문 1] 우리 반은 어느 시간대의 섭취 기록이 가장 많나요? 그래프의 기록 수(건)를 근거로 쓰세요.",
         "[설명 2] 취침시간 분포 막대그래프",
-        "취침시간_분포 시트 A1:B7 선택 → 막대/세로 막대그래프. X축: 취침시간대, Y축: 수면 기록 수(건). 시간 미상 행도 포함합니다.",
+        "취침시간_분포 시트의 파란 테두리 A1:B6 선택 → 막대/세로 막대그래프. X축: 취침시간대, Y축: 수면 기록 수(건). 시간 미상은 그래프에서 제외하고 별도로 확인합니다.",
         "[질문 2] 가장 많은 취침시간대는 언제인가요? 분포의 특징을 쓰세요.",
         "[설명 3] 기상시간 분포 막대그래프",
-        "기상시간_분포 시트 A1:B6 선택 → 막대/세로 막대그래프. X축: 기상시간대, Y축: 수면 기록 수(건). 시간 미상 행도 포함합니다.",
+        "기상시간_분포 시트의 파란 테두리 A1:B5 선택 → 막대/세로 막대그래프. X축: 기상시간대, Y축: 수면 기록 수(건). 시간 미상은 그래프에서 제외하고 별도로 확인합니다.",
         "[질문 3] 가장 많은 기상시간대는 언제인가요? 취침 분포와 함께 읽어 보세요.",
         "[설명 4] 학생 평균 수면시간 구간 원형그래프",
         "수면평균_구간별 시트 A1:B5 선택 → 원형그래프. 범주: 수면평균구간, 값: 학생수(명). 준비된 표를 쓰므로 COUNTIFS 입력이나 구간 전처리를 직접 할 필요가 없습니다.",
@@ -3143,7 +3162,7 @@ function researchCaffeineSheets(source, period) {
         "[질문 4] 어느 수면 평균 구간의 학생이 가장 많나요? 전체 유효 학생 중 비중을 설명하세요.",
         "[설명 5] 카페인량·컨디션 산점도와 선형 추세선",
         "🟡그래프용_산점도 시트에서 X축은 B열 평균카페인량(mg), Y축은 G열 평균수면컨디션점수입니다. 데이터 행: 2~" + scatterEnd + "행. B1:B" + scatterEnd + "와 G1:G" + scatterEnd + "을 각각 선택·지정합니다.",
-        "F열 평균수면시간은 원래 위치를 유지하며 소수 첫째 자리로 표시합니다. B/F/G 열 순서와 계산값은 그대로입니다. 빈칸은 0으로 채우지 않습니다.",
+        "B열과 G열은 같은 파란 외곽 테두리로 표시합니다. 두 열을 각각 복사하되 같은 학생 행끼리 맞추세요. F열 평균수면시간은 원래 위치에서 소수 첫째 자리로 표시하며 빈칸은 0으로 채우지 않습니다.",
         "두 수치가 모두 있는 학생으로 산점도를 만든 뒤 선형 추세선을 추가합니다. B열의 숫자 0mg은 포함합니다. 컨디션 점수는 높을수록 기상 후 상태가 좋음을 뜻합니다.",
         "[질문 5] 점과 선형 추세선은 어떤 경향을 보이나요? 상관관계가 인과관계를 증명하지 않는 이유도 쓰세요.",
         "[설명 6] 카페인 섭취현황: 카페인_시간대별 G1:H7 선택 → 세로 막대그래프. X축: 평균 카페인 구간(mg), Y축: 학생수(명). G9:H14에서 평균 유효·계산 불가와 총원을 확인합니다.",
@@ -3181,6 +3200,18 @@ function researchCaffeineSheets(source, period) {
         guideSheet["!rows"][XLSX.utils.decode_cell(address).r] = { hpt: Math.max(28, Math.ceil(cell.v.length / 54) * 18 + 8) };
       });
       bucketSheet["!cols"] = [{ wch: 34 }, { wch: 12 }, { wch: 3 }, { wch: 31 }, { wch: 14 }];
+      for(const [name,ref] of [["카페인_시간대별","A1:B7"],["카페인_시간대별","G1:H7"],["취침시간_분포","A1:B6"],["기상시간_분포","A1:B5"],["수면평균_구간별","A1:B5"]])lesson3OutlineGraphRange(wb.Sheets[name],ref);
+      lesson3GraphSelectionNote(timeSheet,"A9","파란 테두리 안의 제목·데이터만 선택하세요. 설명·미기록 집계는 제외합니다.",18);
+      lesson3GraphSelectionNote(timeSheet,"G8","평균 카페인 그래프: 파란 테두리 G1:H7 선택",42);
+      timeSheet["!rows"][7]={hpt:28};
+      for(const name of ["취침시간_분포","기상시간_분포"])wb.Sheets[name]["!cols"]=[{wch:18},{wch:12}];
+      lesson3GraphSelectionNote(wb.Sheets["취침시간_분포"],"D9","그래프: 파란 테두리 A1:B6 선택(제목 포함). 시간 미상 행·설명은 제외합니다.");
+      lesson3GraphSelectionNote(wb.Sheets["기상시간_분포"],"D8","그래프: 파란 테두리 A1:B5 선택(제목 포함). 시간 미상 행·설명은 제외합니다.");
+      lesson3GraphSelectionNote(bucketSheet,"D8","원형그래프: 파란 테두리 A1:B5 선택(제목 포함). 오른쪽 검증표·결측 수는 제외합니다.",31);
+      const scatterSheet=wb.Sheets["🟡그래프용_산점도"];
+      if(scatter.length)for(const col of ["B","G"])lesson3OutlineGraphRange(scatterSheet,col+"1:"+col+scatterEnd);
+      scatterSheet["!cols"]=scatterSheet["!cols"]||[];scatterSheet["!cols"][1]={...(scatterSheet["!cols"][1]||{}),wch:22};scatterSheet["!cols"][6]={...(scatterSheet["!cols"][6]||{}),wch:28};
+      lesson3GraphSelectionNote(scatterSheet,"M1",scatter.length?"파란 테두리 B1:B"+scatterEnd+" · G1:G"+scatterEnd+"(제목 포함). 두 열을 각각 복사하되 같은 학생 행끼리 맞추세요. 빈칸은 0으로 채우지 않습니다.":"산점도 자료 없음: 유효 학생 자료를 확인하세요. 두 열을 각각 복사하되 같은 학생 행끼리 맞추세요.",52);
       return wb;
     }
 
