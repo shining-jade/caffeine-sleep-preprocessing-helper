@@ -2910,9 +2910,14 @@ function researchCaffeineSheets(source, period) {
       return { wb, info };
     }
 
-    function dataCheckFileName(info) {
+    function dataCheckPeriodPrefix(period) {
+      const compact = date => dateKeyFlexible(date).replace(/-/g, "").slice(2);
+      return `${compact(period.start)}_${compact(period.end)}`;
+    }
+
+    function dataCheckFileName(info, period) {
       const safe = str => String(str).replace(/[\\/:*?"<>|]/g, "_");
-      return `2차시_내데이터점검_${safe(info._학번 || info.학번 || "unknown")}_${safe(info.이름 || "이름없음")}${exampleSuffix(info)}.xlsx`;
+      return `${dataCheckPeriodPrefix(period)}_내데이터점검_${safe(info._학번 || info.학번 || "unknown")}_${safe(info.이름 || "이름없음")}${exampleSuffix(info)}.xlsx`;
     }
 
     function downloadDataCheck() {
@@ -2922,7 +2927,7 @@ function researchCaffeineSheets(source, period) {
       if (!period) return;
       const result = buildStudentDataCheckWorkbook(sid, period);
       if (!result) { alert("해당 학생 데이터가 없습니다."); return; }
-      XLSX.writeFile(result.wb, dataCheckFileName(result.info));
+      XLSX.writeFile(result.wb, dataCheckFileName(result.info, period));
     }
 
     async function downloadDataCheckZip() {
@@ -2945,14 +2950,14 @@ function researchCaffeineSheets(source, period) {
         const result = buildStudentDataCheckWorkbook(sid, period);
         if (!result) continue;
         const bytes = XLSX.write(result.wb, { bookType: "xlsx", type: "array" });
-        zip.file(dataCheckFileName(result.info), bytes);
+        zip.file(dataCheckFileName(result.info, period), bytes);
         await new Promise(r => setTimeout(r, 0));
       }
       const blob = await zip.generateAsync({ type: "blob" });
       if (zipRevision !== processingRevision) return;
       const a = document.createElement("a");
       a.href = URL.createObjectURL(blob);
-      a.download = klass ? `2차시_내데이터점검_${klass}반.zip` : "2차시_내데이터점검_전체.zip";
+      a.download = `${dataCheckPeriodPrefix(period)}_내데이터점검_${klass ? safeFileName(klass) + "반" : "전체"}.zip`;
       a.click();
       URL.revokeObjectURL(a.href);
       btn.disabled = false;
