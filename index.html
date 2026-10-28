@@ -366,7 +366,7 @@
   <header>
     <h1>교사용 카페인·수면 분석자료 생성기 v73</h1>
     <p>교사가 카페인·수면 원자료를 넣으면, 학생 활동에 사용할 반별·개인별 분석 데이터와 AI 분석용 CSV를 자동 생성합니다.</p>
-    <p id="publication-update">최근 반영: 2026-10-27T10:56:35Z (UTC). 3차시 Excel의 그래프 선택 범위를 파란 외곽 테두리로 표시하고 안내를 추가했습니다. 값·계산과 6개 시트를 유지합니다. 최신 화면이 보이지 않으면 파일 선택 전에 Ctrl+F5로 새로고침한 뒤 전처리·다운로드를 다시 실행하세요.</p>
+    <p id="publication-update">최근 반영: 2026-10-28T00:59:17Z (UTC). 4차시 가상 인물 연습을 추가했습니다. 업로드 없이 사례와 자료 종료일(기상일 기준)을 선택하면 같은 28일 자료의 Excel과 AI 나무를 사용할 수 있습니다. 실제·TEST00·연구 자료 처리와 3차시 기능은 유지합니다. 이전 화면이 보이면 파일 선택 전에 Ctrl+F5로 새로고침하세요.</p>
   </header>
 
   <main>
@@ -424,6 +424,15 @@
           <small>13~18세 권장 수면시간을 참고한 안내입니다. 컨디션 분류는 연구자가 정한 수업용 기준이며 임상 진단·SHI·PSQI 점수가 아닙니다.</small>
         </div>
         <div class="notice">수업용 예시 데이터는 2·4·6차시의 학생 선택에서 개별 저장할 수 있습니다. ZIP 포함 여부는 각 차시에서 선택하세요. 반별 자료·비교·연구용 엑셀에는 항상 포함되지 않습니다.</div>
+        <section id="lesson4PracticeSection" style="border:2px solid #ab8a47;border-radius:10px;padding:16px;margin:16px 0;background:#fffdf7">
+          <h3>[4차시] 가상 인물로 연습</h3><p>28일 패턴 고정 · 날짜 변경 가능 · 실제 학생/연구 집계 제외 · 인과관계 증명 아님. 업로드 없이 사용할 수 있습니다.</p>
+          <label>가상 사례 <select id="lesson4PracticeSelect"><option value="">사례 선택</option><option value="late-caffeine-v1">가상인물 A · 늦은 카페인과 컨디션</option><option value="long-phone-v1">가상인물 B · 적은 카페인과 긴 휴대폰 사용</option><option value="mixed-factors-v1">가상인물 C · 여러 요인이 섞인 기록</option></select></label>
+          <label>자료 종료일(기상일 기준) <input id="lesson4PracticeWakeEnd" type="date"></label>
+          <p style="font-size:12px">기본값은 KST 전날입니다. 수업 전날 등 원하는 종료일을 고르세요. 미래 날짜도 가상 시나리오 일정이며 실제 관측일이 아닙니다. 실제 자료의 날짜 설정은 적용하지 않습니다. 종료일 변경 후 Excel과 나무를 다시 만드세요.</p>
+          <p id="lesson4PracticePeriod" style="font-size:12px;color:#66532b"></p>
+          <button id="lesson4PracticeExcel" class="secondary" disabled>4차시 연습 Excel 다운로드</button><button id="lesson4PracticeTree" class="secondary" disabled>같은 사례 AI 나무 보기</button>
+          <div id="lesson4PracticePanel" style="display:none;margin-top:16px"></div>
+        </section>
         <div class="metrics" id="metrics"></div>
         <div class="actions">
           <button id="downloadTeacher" disabled>📥 교사용 전체 전처리 결과</button>
@@ -1716,6 +1725,7 @@ var SleepRecordPolicy = (function () {
     }
 
     function preprocess(workbook) {
+      rejectLesson4PracticeUpload(workbook);
       const source = {};
       ["students", "caffeine", "sleep"].forEach(k => {
         const sheet = findSheet(workbook, k);
@@ -3055,6 +3065,10 @@ function researchCaffeineSheets(source, period) {
           비고: check.비고 || row.데이터품질메모 || ""
         });
       });
+      return buildLesson4WorkbookFromModel({myRows,info,episodeRows:state.episodeRecords||[],sid});
+    }
+
+    function buildLesson4WorkbookFromModel({myRows,info,episodeRows,sid}) {
       const personalColumns = [
         "분석일", "나의_일일카페인총량_mg", "나의_카페인기록구분", "나의_카페인0mg간주여부", "나의_카페인기록총량_mg", "나의_카페인섭취횟수", "나의_카페인종류", "나의_최후섭취시각",
         "나의_카페인집계구간", "나의_오전카페인여부", "나의_오후카페인여부", "나의_저녁카페인여부", "나의_수면시간_h", "나의_컨디션_원자료", "나의_컨디션_점수",
@@ -3083,7 +3097,7 @@ function researchCaffeineSheets(source, period) {
         "반 평균과 비교했을 때 내가 높은 항목과 낮은 항목은 무엇인가요?",
         "나의 수면에 영향을 준 것 같은 요인 2가지를 고르고 근거를 적어보세요.",
       ])), "해석질문");
-      if(!wb.SheetNames.includes('수면기록_상태'))appendSleepFormattedSheet(wb,XLSX.utils.json_to_sheet((state.episodeRecords||[]).filter(r=>r.익명ID===sid).map(({이름,번호,_학번,...r})=>r)),'수면기록_상태');
+      if(!wb.SheetNames.includes('수면기록_상태'))appendSleepFormattedSheet(wb,XLSX.utils.json_to_sheet(episodeRows.filter(r=>r.익명ID===sid).map(({이름,번호,_학번,...r})=>r)),'수면기록_상태');
       return { wb, info };
     }
 
@@ -3677,6 +3691,7 @@ function researchCaffeineSheets(source, period) {
     }
 
     function clearProcessedResults() {
+      clearLesson4Practice();
       processingRevision += 1;
       clearLesson3Examples();
       lessonExportBusy.classes = false;
@@ -3767,6 +3782,130 @@ function researchCaffeineSheets(source, period) {
       const stamp = new Date().toISOString().slice(0, 16).replace(/[-:T]/g, "");
       appendProcessingSummary(workbook);
       XLSX.writeFile(workbook, "교사용_전체전처리결과_" + stamp + ".xlsx");
+    }
+
+    // Built-in fictional lesson4 data never enters uploaded/research/TEST00 state.
+    const lesson4AuthoredCases=new WeakSet(),lesson4PreparedBundles=new WeakSet();
+    function lesson4Freeze(value){if(value&&typeof value==='object'&&!Object.isFrozen(value)){Object.values(value).forEach(lesson4Freeze);Object.freeze(value);}return value;}
+    function lesson4Day(day,offset=0){if(!/^\d{4}-\d{2}-\d{2}$/.test(String(day)))throw new Error('자료 종료일(기상일 기준)을 선택하세요.');const d=new Date(day+'T00:00:00Z');if(!Number.isFinite(d.getTime())||d.toISOString().slice(0,10)!==day)throw new Error('올바른 자료 종료일을 선택하세요.');d.setUTCDate(d.getUTCDate()+offset);return d.toISOString().slice(0,10);}
+    function lesson4PracticeDefaultEnd(now=new Date()){return lesson4Day(new Date(now.getTime()+9*36e5).toISOString().slice(0,10),-1);}
+    function lesson4PracticeCases(){return [{caseId:'late-caffeine-v1',letter:'A',displayName:'가상인물 A · 늦은 카페인과 컨디션'},{caseId:'long-phone-v1',letter:'B',displayName:'가상인물 B · 적은 카페인과 긴 휴대폰 사용'},{caseId:'mixed-factors-v1',letter:'C',displayName:'가상인물 C · 여러 요인이 섞인 기록'}];}
+    function getLesson4PracticeCase(caseId){
+      const descriptor=lesson4PracticeCases().find(c=>c.caseId===caseId);if(!descriptor)throw new Error('내장 가상 사례를 선택하세요.');
+      const raw={kind:'lesson4-fictional',schemaVersion:1,caseVersion:1,...descriptor,personKey:'practice::'+caseId,timezone:'Asia/Seoul',days:[],caffeineEvents:[],coverage:[]};
+      // Deterministic authored day-index schedule; no randomization or tree-result tuning.
+      const four=['안 함','30분 미만','30~60분','60분 이상'];
+      for(let i=0;i<28;i++){
+        const a=caseId==='late-caffeine-v1',b=caseId==='long-phone-v1';
+        const late=a?i<14:b?false:i%4>=2;
+        const phone=a?i%4+1:b?(i<16?3+i%2:1+i%2):(i%2?4:1);
+        const good=a?(i<14?i>=10:i<24):b?(i<16?i<5:i<25):late!==(phone===4);
+        const condition=good?4+i%2:2+i%2,mg=a?100:b?[0,0,20,0,0,40,0][i%7]:50;
+        const analysisDate=lesson4Day('2000-01-01',i),wakeDate=lesson4Day(analysisDate,1),dayId=caseId+':day:'+String(i+1).padStart(2,'0');
+        const day={dayIndex:i,dayId,analysisDate,bedAt:analysisDate+'T23:30:00+09:00',wakeAt:wakeDate+'T'+['07:00','07:30','08:00'][i%3]+':00+09:00',condition:['😫','😴','😐','🙂','😊'][condition-1],phone:four[phone-1],activity:four[a||b?(i*3)%4:(i%7)%4],latency:'15~30분',awakenings:'없음',drowsy:'조금 있었음'};
+        raw.days.push(day);raw.caffeineEvents.push({eventId:dayId+':caffeine',intakeAt:analysisDate+'T'+(late?'21:00':'08:30')+':00+09:00',amountMg:mg,drinkLabel:mg?'가상 음료':'명시적 미섭취'});
+        raw.coverage.push({dayId,from:lesson4Day(analysisDate,-1)+'T23:30:00+09:00',to:day.bedAt,complete:true,basis:'authored-complete-fixture'});
+      }
+      lesson4AuthoredCases.add(raw);return lesson4Freeze(raw);
+    }
+    function shiftPracticeCaseDates(pattern,selectedWakeEnd){
+      if(!lesson4AuthoredCases.has(pattern))throw new Error('확인된 내장 가상 자료만 이동할 수 있습니다.');lesson4Day(selectedWakeEnd);
+      const shiftDays=(Date.parse(selectedWakeEnd+'T00:00:00+09:00')-Date.parse('2000-01-29T00:00:00+09:00'))/864e5;
+      const raw=JSON.parse(JSON.stringify(pattern)),move=s=>new Date(Date.parse(s)+shiftDays*864e5+9*36e5).toISOString().slice(0,19)+'+09:00';
+      raw.days.forEach(d=>{d.bedAt=move(d.bedAt);d.wakeAt=move(d.wakeAt);d.analysisDate=lesson4Day(d.analysisDate,shiftDays);});raw.caffeineEvents.forEach(e=>e.intakeAt=move(e.intakeAt));raw.coverage.forEach(c=>{c.from=move(c.from);c.to=move(c.to);});raw.shiftDays=shiftDays;lesson4AuthoredCases.add(raw);return lesson4Freeze(raw);
+    }
+    function practiceCaffeineWindow(raw,day,hours){
+      if(!lesson4AuthoredCases.has(raw)||!raw.days.includes(day))throw new Error('확인된 내장 가상 자료의 완결성만 사용할 수 있습니다.');
+      const bed=Date.parse(day.bedAt),lower=bed-hours*36e5,c=raw.coverage.find(c=>c.dayId===day.dayId);
+      if(!Number.isFinite(bed)||![4,6,8,12,24].includes(hours)||!c?.complete||!Number.isFinite(Date.parse(c.from))||!Number.isFinite(Date.parse(c.to))||c.basis!=='authored-complete-fixture'||Date.parse(c.from)>lower||Date.parse(c.to)<bed)throw new Error('가상 자료 시간창 완결성 확인 실패');
+      if(raw.caffeineEvents.some(e=>!Number.isFinite(Date.parse(e.intakeAt))||typeof e.amountMg!=='number'||!Number.isFinite(e.amountMg)||e.amountMg<0))throw new Error('가상 카페인 시각·함량 확인 실패');
+      const events=raw.caffeineEvents.filter(e=>Date.parse(e.intakeAt)>=lower&&Date.parse(e.intakeAt)<bed),total=events.reduce((s,e)=>s+e.amountMg,0);
+      return {status:'authored-complete',total,recordedIntake:events.some(e=>e.amountMg>0),events};
+    }
+    async function prepareLesson4Practice(caseId,selectedWakeEnd){
+      const raw=shiftPracticeCaseDates(getLesson4PracticeCase(caseId),selectedWakeEnd),rows=raw.days.map(day=>{
+        const w=practiceCaffeineWindow(raw,day,24),positive=w.events.filter(e=>e.amountMg>0),hour=e=>Number(e.intakeAt.slice(11,13))+Number(e.intakeAt.slice(14,16))/60;
+        const flags=[positive.some(e=>hour(e)<15),positive.some(e=>hour(e)>=15&&hour(e)<18),positive.some(e=>hour(e)>=18)].map(Number),score=scoreConditionChoice(day.condition).score;
+        const duration=SleepRecordPolicy.describe({date:day.bedAt.slice(0,10),start:day.bedAt.slice(11,16),wakeDate:day.wakeAt.slice(0,10),end:day.wakeAt.slice(11,16),sleepType:'main'}).intervalHours;
+        const row={분석일:day.analysisDate,가상기록ID:day.dayId,익명ID:raw.personKey,이름:raw.displayName,수면시간_h:duration,수면시간_분류:classifySleepHours(duration),권장수면여부:duration>=8&&duration<=10?1:0,수면컨디션_원자료:day.condition,수면컨디션_점수:score,컨디션좋음여부:score>=4?1:0,취침시간:day.bedAt.slice(11,16),기상시간:day.wakeAt.slice(11,16),카페인기록총량_mg:w.total,일일카페인총량_mg:w.total,카페인기록구분:w.total?'섭취 기록':'명시적 0mg 기록',카페인0mg간주여부:0,카페인섭취횟수:positive.length,주요음료:positive.length?'가상 음료':'명시적 미섭취',최후섭취시각:positive.length?positive[positive.length-1].intakeAt.slice(11,16):'',카페인집계구간:raw.coverage[day.dayIndex].from+' ~ '+day.bedAt,오전카페인여부:flags[0],오후카페인여부:flags[1],저녁카페인여부:flags[2],카페인섭취시간대수:flags.reduce((a,b)=>a+b,0),취침전스마트폰_원자료:day.phone,취침전스마트폰_점수:scorePhoneChoice(day.phone).score,신체활동시간_원자료:day.activity,신체활동_점수:scoreActivityChoice(day.activity).score,수면잠복기_원자료:day.latency,수면잠복기_점수:scoreSleepLatencyChoice(day.latency).score,중도각성_원자료:day.awakenings,중도각성_점수:scoreAwakeningChoice(day.awakenings).score,낮졸음집중력_원자료:day.drowsy,낮졸음집중력_점수:scoreDrowsyChoice(day.drowsy).score,실제취침시각:day.bedAt,실제기상시각:day.wakeAt,실제취침일:day.bedAt.slice(0,10),실제기상일:day.wakeAt.slice(0,10),주수면분석상태:'사용',수면유형:'main',데이터품질상태:'정상',데이터품질메모:'내장 가상 자료 · 실제 관측 아님'};
+        for(const hours of [4,6,8,12]){row['취침'+hours+'시간이내카페인여부']=Number(practiceCaffeineWindow(raw,day,hours).recordedIntake);row['취침전'+hours+'시간_기록상태']='가상 목록 완결';}return row;
+      });
+      const meta={kind:raw.kind,caseId,caseVersion:raw.caseVersion,letter:raw.letter,displayName:raw.displayName,timezone:raw.timezone,selectedWakeEnd,wakeStart:lesson4Day(selectedWakeEnd,-27),wakeEnd:selectedWakeEnd,analysisStart:lesson4Day(selectedWakeEnd,-28),analysisEnd:lesson4Day(selectedWakeEnd,-1),policy:'practice-neutral-v1',shiftDays:raw.shiftDays};
+      const treeRows=rows.map(r=>pickColumns(r,treeColumns));if(!treeRows.every(r=>treeColumns.every(k=>typeof r[k]==='number'&&Number.isFinite(r[k]))))throw new Error('가상 AI 입력 검증 실패');
+      const bundle={meta,rawCase:raw,analysisRows:rows,treeRows};const bytes=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(JSON.stringify(bundle)));bundle.digest=Array.from(new Uint8Array(bytes),b=>b.toString(16).padStart(2,'0')).join('');lesson4PreparedBundles.add(bundle);return lesson4Freeze(bundle);
+    }
+
+    function lesson4RequireBundle(bundle){if(!lesson4PreparedBundles.has(bundle))throw new Error('현재 준비된 내장 가상 자료가 아닙니다.');return bundle;}
+    function lesson4PracticeFileName(bundle){lesson4RequireBundle(bundle);return '4차시_가상인물_'+bundle.meta.letter+'_28일_개인분석연습_기상종료'+bundle.meta.wakeEnd.replace(/-/g,'')+'.xlsx';}
+    function buildLesson4PracticeWorkbook(bundle){
+      lesson4RequireBundle(bundle);const meta=bundle.meta,info={익명ID:bundle.rawCase.personKey,이름:meta.displayName};
+      const myRows=bundle.analysisRows.map(row=>{
+        const projected={분석일:row.분석일};
+        projected.나의_일일카페인총량_mg=row.카페인기록총량_mg;
+        for(const key of ['카페인기록구분','카페인0mg간주여부','카페인기록총량_mg','카페인섭취횟수','최후섭취시각','카페인집계구간','오전카페인여부','오후카페인여부','저녁카페인여부','수면시간_h','취침전스마트폰_점수','신체활동_점수','수면잠복기_점수','중도각성_점수','낮졸음집중력_점수','수면시간_분류','권장수면여부','컨디션좋음여부'])projected['나의_'+key]=row[key];
+        projected.나의_카페인종류=row.주요음료;projected.나의_컨디션_원자료=row.수면컨디션_원자료;projected.나의_컨디션_점수=row.수면컨디션_점수;projected.나의_수면컨디션_점수=row.수면컨디션_점수;
+        for(const key of ['카페인총량_mg','수면시간_h','컨디션_점수','수면컨디션_점수'])projected['반평균_'+key]='';projected['점검 상태']='가상 자료';projected.비고='실제 관측 아님 · 완결된 가상 기록 목록';return projected;
+      });
+      const {wb}=buildLesson4WorkbookFromModel({myRows,info,episodeRows:bundle.analysisRows,sid:info.익명ID});
+      const guide=wb.Sheets['활동안내'];for(const cell of Object.values(guide))if(typeof cell?.v==='string'){cell.v=cell.v.replace('이 파일은 4차시 개인 데이터 분석 활동용입니다.','이 파일은 내장 가상 인물의 4차시 연습 자료입니다. 실제 학생 관측치가 아닙니다.').replace('3. 반평균_비교 시트에서 내 기록이 반 평균과 비슷한지 다른지 확인합니다.','3. 가상 인물에는 반 평균이 없습니다. 반평균_비교의 빈칸을 0으로 채우지 않습니다.');}
+      const rows=[['자료 구분','lesson4-fictional'],['사례',meta.displayName],['사례 ID/버전',meta.caseId+' / '+meta.caseVersion],['자료 종료일(기상일 기준)',meta.wakeEnd],['기상일 범위',meta.wakeStart+' ~ '+meta.wakeEnd],['분석일 범위(기상일 전날)',meta.analysisStart+' ~ '+meta.analysisEnd],['가상 일정','선택한 날짜로 옮긴 가상 시나리오이며 실제 관측치가 아닙니다. 미래 일정도 연습용으로만 허용합니다.'],['동일 자료 확인 SHA256',bundle.digest],['AI 정책',meta.policy],['목표','컨디션 4~5점=좋음 / 1~3점=그 외. 인과관계 증명 아님.'],['완결성','가상 목록을 빠짐없이 작성한 시간창만 양수 기록 없음=0. 실제 기록 결측은 그대로 보존합니다.'],['카페인 기준','취침 전24시간 [취침−24h, 취침), 4/6/8/12h도 시작 포함·끝 제외.'],['AI 시간대 여부','오전 <15시 / 오후15~18시 / 저녁18시 이후. 3차시 여섯 시간대와 다른 지표.'],['연습 방법','개인_일별자료·그래프용으로 살펴본 뒤 같은 사례·종료일의 AI 나무와 비교하세요.'],['반 평균','가상 인물의 반 평균은 없습니다. 빈칸은0이 아닙니다.'],['주의','연구·실제 반별 자료와 혼합하지 않습니다. 이 파일을 원자료로 업로드하지 않습니다.']];
+      appendSleepFormattedSheet(wb,XLSX.utils.aoa_to_sheet([['항목','내용'],...rows]),'가상자료_안내');
+      appendSleepFormattedSheet(wb,XLSX.utils.aoa_to_sheet([['분석일',...treeColumns,'가상기록ID'],...bundle.analysisRows.map((r,i)=>[r.분석일,...treeColumns.map(k=>bundle.treeRows[i][k]),r.가상기록ID])]),'AI연습_입력');
+      wb.SheetNames=['가상자료_안내',...wb.SheetNames.filter(n=>n!=='가상자료_안내')];
+      for(const cell of Object.values(wb.Sheets['해석질문']))if(typeof cell?.v==='string'&&cell.v.includes('반 평균과 비교'))cell.v='이 인물의 컨디션 좋은 날과 그 외의 날을 비교하면 어떤 생활요인이 함께 달랐나요?';
+      for(const name of ['개인_일별자료','수면기록_상태']){const ws=wb.Sheets[name];ws['!rows']=ws['!rows']||[];for(const [address,cell]of Object.entries(ws)){if(address.startsWith('!'))continue;const pos=XLSX.utils.decode_cell(address);if(pos.r>0){cell.s={...(cell.s||{}),alignment:{wrapText:typeof cell.v==='string',vertical:'top'}};ws['!rows'][pos.r]={hpt:48};}}}
+
+      const notice=wb.Sheets['가상자료_안내'];notice['!cols']=[{wch:32},{wch:94}];notice['!rows']=[];for(const [a,c]of Object.entries(notice))if(!a.startsWith('!')){c.s={alignment:{wrapText:true,vertical:'top'}};notice['!rows'][XLSX.utils.decode_cell(a).r]={hpt:42};}
+      for(const name of ['개인_일별자료','반평균_비교','그래프용','AI연습_입력','수면기록_상태'])if(wb.Sheets[name]){const ws=wb.Sheets[name],range=XLSX.utils.decode_range(ws['!ref']);ws['!cols']=Array.from({length:range.e.c+1},(_,i)=>({wch:i===0?14:22}));ws['!rows']=[{hpt:48}];for(let c=0;c<=range.e.c;c++){const cell=ws[XLSX.utils.encode_cell({r:0,c})];if(cell)cell.s={...(cell.s||{}),font:{bold:true},alignment:{wrapText:true,vertical:'top'}};}}
+      for(const name of ['개인_일별자료','수면기록_상태']){const ws=wb.Sheets[name],range=XLSX.utils.decode_range(ws['!ref']);for(let c=0;c<=range.e.c;c++){const head=ws[XLSX.utils.encode_cell({r:0,c})]?.v||'';if(String(head).includes('집계구간')||String(head).includes('실제취침시각')||String(head).includes('실제기상시각'))ws['!cols'][c]={wch:52};}for(let r=1;r<=range.e.r;r++)ws['!rows'][r]={hpt:48};}
+      wb.Sheets['AI연습_입력']['!cols'][14]={wch:46};
+      return wb;
+    }
+
+    let lesson4PracticeExportToken=null;
+    let lesson4PracticeState={caseId:'',selectedWakeEnd:'',revision:0,bundle:null,pending:null};
+    function lesson4PracticeValidSelection(){try{lesson4Day($('lesson4PracticeWakeEnd').value);return lesson4PracticeCases().some(c=>c.caseId===$('lesson4PracticeSelect').value);}catch{return false;}}
+    function clearLesson4Practice(){const preview=$("lesson4PracticePeriod");if(preview){try{const end=$("lesson4PracticeWakeEnd").value;lesson4Day(end);preview.textContent="기상일 "+lesson4Day(end,-27)+" ~ "+end+" / 분석일 "+lesson4Day(end,-28)+" ~ "+lesson4Day(end,-1)+" · 28일 가상 일정(실제 관측 아님)";}catch{preview.textContent="자료 종료일(기상일 기준)을 선택하세요.";}}lesson4PracticeExportToken=null;lesson4PracticeState={caseId:'',selectedWakeEnd:'',revision:lesson4PracticeState.revision+1,bundle:null,pending:null};const p=$('lesson4PracticePanel');if(p){p.innerHTML='';p.style.display='none';}for(const id of ['lesson4PracticeExcel','lesson4PracticeTree'])if($(id))$(id).disabled=!lesson4PracticeValidSelection();}
+    function lesson4PracticeIsCurrent(bundle){return !!bundle&&lesson4PracticeState.bundle===bundle&&bundle.meta.caseId===$('lesson4PracticeSelect').value&&bundle.meta.selectedWakeEnd===$('lesson4PracticeWakeEnd').value;}
+    async function currentLesson4PracticeBundle(){
+      if(!lesson4PracticeValidSelection())throw new Error('가상 사례와 자료 종료일(기상일 기준)을 선택하세요.');
+      const caseId=$('lesson4PracticeSelect').value,end=$('lesson4PracticeWakeEnd').value,rev=lesson4PracticeState.revision;
+      const matches=()=>rev===lesson4PracticeState.revision&&caseId===$('lesson4PracticeSelect').value&&end===$('lesson4PracticeWakeEnd').value;
+      if(lesson4PracticeState.bundle&&lesson4PracticeIsCurrent(lesson4PracticeState.bundle)){const cached=lesson4PracticeState.bundle;await Promise.resolve();return matches()?cached:null;}
+      if(!lesson4PracticeState.pending)lesson4PracticeState.pending=prepareLesson4Practice(caseId,end);
+      const pending=lesson4PracticeState.pending;let bundle;try{bundle=await pending;}catch(error){if(matches()&&lesson4PracticeState.pending===pending)lesson4PracticeState.pending=null;throw error;}if(!matches())return null;
+      lesson4PracticeState={caseId,selectedWakeEnd:end,revision:rev,bundle,pending:null};return bundle;
+    }
+    function practiceSplit(rows,visual,depth){
+      const minN=visual?VISUAL_TREE_MIN_LEAF_N:depth===0?TREE_MIN_CHILD_N:TREE_MIN_SECOND_CHILD_N,minGain=depth===0?TREE_MIN_GAIN:TREE_MIN_SECOND_GAIN,parent=gini(rows);let best=null;
+      TREE_FEATURES.forEach((feature,featureIndex)=>thresholdsForFeature(rows,feature).forEach(threshold=>{
+        const left=rows.filter(r=>r[feature]<=threshold),right=rows.filter(r=>r[feature]>threshold);if(left.length<minN||right.length<minN)return;
+        const weightedGini=(left.length*gini(left)+right.length*gini(right))/rows.length,gain=parent-weightedGini;
+        if(visual?gain<=0:gain<minGain||!hasStableClassCounts(left)||!hasStableClassCounts(right))return;
+        const candidate={feature,featureIndex,threshold,left,right,gain,weightedGini};if(!best||weightedGini<best.weightedGini||weightedGini===best.weightedGini&&(featureIndex<best.featureIndex||featureIndex===best.featureIndex&&threshold<best.threshold))best=candidate;
+      }));return best;
+    }
+    function practiceNeutralTree(rows,visual=false,depth=0){
+      if(!rows.length)return null;if(rows.length<10&&depth===0)return makeLeaf(rows,'유효 기록이 10건 미만입니다.');
+      if(isPure(rows))return makeLeaf(rows,'한쪽 결과만 있어 더 나누지 않았습니다.');if(depth>=(visual?VISUAL_TREE_MAX_DEPTH:TREE_MAX_DEPTH))return makeLeaf(rows,'연습 나무 최대 깊이에 도달했습니다.');
+      const split=practiceSplit(rows,visual,depth);if(!split)return makeLeaf(rows,'안정적인 첫 질문 또는 다음 질문이 발견되지 않았습니다.');
+      const {good,bad}=classCounts(rows);return {leaf:false,visualFallback:visual,feature:split.feature,threshold:split.threshold,n:rows.length,good,bad,gain:split.gain,...(visual?{warning:'관찰용 표시입니다. 엄격한 표본·안정성 기준을 통과한 규칙이 아닐 수 있습니다.'}:{}),no:practiceNeutralTree(split.left,visual,depth+1),yes:practiceNeutralTree(split.right,visual,depth+1)};
+    }
+    function buildPracticeTree(bundle){lesson4RequireBundle(bundle);const rows=bundle.treeRows.map(r=>({...r})),strictTree=practiceNeutralTree(rows),fallback=strictTree?.leaf?practiceNeutralTree(rows,true):null;return {strictTree,displayTree:fallback&&!fallback.leaf?fallback:strictTree,policy:bundle.meta.policy,counts:{n:rows.length,...classCounts(rows)}};}
+    function lesson4PracticeError(error){const p=$('lesson4PracticePanel');p.style.display='block';p.innerHTML='<p>'+escapeHtml(error.message)+'</p>';}
+    async function drawLesson4PracticeTree(){const revision=lesson4PracticeState.revision;try{
+      const bundle=await currentLesson4PracticeBundle();if(!lesson4PracticeIsCurrent(bundle))return;const m=bundle.meta,result=buildPracticeTree(bundle),tree=result.displayTree;
+      const panel=$('lesson4PracticePanel');panel.style.display='block';panel.innerHTML=`<h3>${escapeHtml(m.displayName)} · 가상 연습 나무</h3><p>가상 시나리오 일정이며 실제 관측치가 아닙니다. 연구·반별 집계 제외 · 인과관계 증명 아님.</p><p>자료 종료일(기상일 기준): ${m.wakeEnd}<br>기상일 ${m.wakeStart} ~ ${m.wakeEnd} / 분석일(기상일 전날) ${m.analysisStart} ~ ${m.analysisEnd}</p><p>동일 자료: ${escapeHtml(lesson4PracticeFileName(bundle))} · 28건, 컨디션 좋음 ${result.counts.good} / 그 외 ${result.counts.bad}</p><p>정책: ${result.policy} · 컨디션 4~5점=좋음. 가상 자료에만 방향 중립 기준을 사용하며 실제 자료의 기존 처리와 다릅니다. ${tree?.visualFallback?'관찰용: 엄격한 안정성 기준을 통과한 규칙이 아닙니다.':''}</p>${tree?.leaf?'<p>안정적인 첫 질문이 발견되지 않았습니다. 두 결과가 섞인 기록도 함께 해석하세요.</p>':''}<div style="overflow:auto">${tree?renderTreeSvg(tree):''}</div><p style="overflow-wrap:anywhere">자료 SHA256: ${bundle.digest}</p><p>카페인 총량은 취침 전24시간 [취침−24h, 취침)입니다. 완결된 가상 목록에서만 시간창의 양수 섭취 기록 없음=0입니다. 실제 기록 결측을 0으로 채운 것이 아닙니다.</p>`;
+    }catch(error){if(revision===lesson4PracticeState.revision)lesson4PracticeError(error);}}
+    async function downloadLesson4PracticeExcel(){
+      if(lesson4PracticeExportToken)return;const token={revision:lesson4PracticeState.revision};lesson4PracticeExportToken=token;$("lesson4PracticeExcel").disabled=true;
+      try{const bundle=await currentLesson4PracticeBundle();if(!lesson4PracticeIsCurrent(bundle))return;const wb=buildLesson4PracticeWorkbook(bundle);if(lesson4PracticeIsCurrent(bundle))XLSX.writeFile(wb,lesson4PracticeFileName(bundle));}
+      catch(error){if(token.revision===lesson4PracticeState.revision)lesson4PracticeError(error);}
+      finally{if(lesson4PracticeExportToken===token){lesson4PracticeExportToken=null;$("lesson4PracticeExcel").disabled=!lesson4PracticeValidSelection();}}
+    }
+    function rejectLesson4PracticeUpload(workbook){
+      if(workbook.Sheets?.['가상자료_안내']&&Object.values(workbook.Sheets['가상자료_안내']).some(c=>String(c?.v??'').trim()==='lesson4-fictional'))throw new Error('가상 연습 Excel은 실제 연구 원자료로 업로드할 수 없습니다. 전용 가상 인물 선택을 사용하세요.');
+      for(const name of ['students','sleep','caffeine']){const ws=findSheet(workbook,name);if(!ws)continue;for(const row of sheetRows(workbook,ws))for(const [key,value]of Object.entries(row))if(['학번','전체학번','학생ID','studentId','id','익명ID','연구대상자코드','연구코드','researchCode'].map(compact).includes(compact(key))&&String(value??'').trim().toLowerCase().startsWith('practice::'))throw new Error('가상 자료 식별자가 원자료에 섞였습니다. 실제 자료와 분리하세요.');}
     }
 
     function treeModeLabel() {
@@ -4695,6 +4834,11 @@ function researchCaffeineSheets(source, period) {
 
     // 반 선택 시 학생 드롭다운 갱신
     $("classForStudent").addEventListener("change", populateStudentSelect);
+    $("lesson4PracticeWakeEnd").value=lesson4PracticeDefaultEnd();
+    for(const id of ["lesson4PracticeSelect","lesson4PracticeWakeEnd"])for(const event of ["change","input"])$(id).addEventListener(event,clearLesson4Practice);
+    $("lesson4PracticeExcel").addEventListener("click",downloadLesson4PracticeExcel);
+    $("lesson4PracticeTree").addEventListener("click",drawLesson4PracticeTree);
+    clearLesson4Practice();
     $("classSelect").addEventListener("change", () => { clearLesson3Examples(); updateLessonDownloadButtons(); });
     $("showLesson3Examples").addEventListener("click", drawLesson3Examples);
     ["analysisStart","analysisEnd"].forEach(id => ["input","change"].forEach(event => $(id).addEventListener(event, () => { clearLesson3Examples(); updateLessonDownloadButtons(); })));
