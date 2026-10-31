@@ -366,7 +366,7 @@
   <header>
     <h1>교사용 카페인·수면 분석자료 생성기 v73</h1>
     <p>교사가 카페인·수면 원자료를 넣으면, 학생 활동에 사용할 반별·개인별 분석 데이터와 AI 분석용 CSV를 자동 생성합니다.</p>
-    <p id="publication-update">최근 반영: 2026-10-31T22:26:55Z (UTC). 4차시 나무의 스마트폰·신체활동 질문과 해설에 점수와 시간을 함께 표시합니다. 1점=안 함, 2점=30분 미만, 3점=30~60분, 4점=60분 이상입니다. 실제 반·전체·가상 사례의 표시를 맞췄으며 데이터·모델·임계값·가상 C의 생성규칙은 그대로입니다. 이전 화면이 보이면 파일 선택 전에 Ctrl+F5로 새로고침하세요.</p>
+    <p id="publication-update">최근 반영: 2026-10-31T22:56:16Z (UTC). 4차시 나무에 행동 조건별 가지와 좋음/전체 기록수·관찰 비율·읽기 안내를 함께 표시합니다. 그림 복사(PNG)·PNG 다운로드·그림 인쇄를 지원하며 복사가 허용되지 않으면 다운로드를 이용하세요. 예/아니오는 행동 조건에 해당하는지의 뜻입니다. 데이터·모델·임계값·가상 사례 생성규칙은 그대로입니다. 이전 화면이 보이면 파일 선택 전에 Ctrl+F5로 새로고침하세요.</p>
   </header>
 
   <main>
@@ -3690,6 +3690,7 @@ function researchCaffeineSheets(source, period) {
     }
 
     function clearProcessedResults() {
+      clearTreeImage("real");
       clearLesson4Practice();
       processingRevision += 1;
       clearLesson3Examples();
@@ -3866,7 +3867,7 @@ function researchCaffeineSheets(source, period) {
     let lesson4PracticeExportToken=null;
     let lesson4PracticeState={caseId:'',selectedWakeEnd:'',revision:0,bundle:null,pending:null};
     function lesson4PracticeValidSelection(){try{lesson4Day($('lesson4PracticeWakeEnd').value);return lesson4PracticeCases().some(c=>c.caseId===$('lesson4PracticeSelect').value);}catch{return false;}}
-    function clearLesson4Practice(){const preview=$("lesson4PracticePeriod");if(preview){try{const end=$("lesson4PracticeWakeEnd").value;lesson4Day(end);preview.textContent="기상일 "+lesson4Day(end,-27)+" ~ "+end+" / 분석일 "+lesson4Day(end,-28)+" ~ "+lesson4Day(end,-1)+" · 28일 가상 일정(실제 관측 아님)";}catch{preview.textContent="자료 종료일(기상일 기준)을 선택하세요.";}}lesson4PracticeExportToken=null;lesson4PracticeState={caseId:'',selectedWakeEnd:'',revision:lesson4PracticeState.revision+1,bundle:null,pending:null};const p=$('lesson4PracticePanel');if(p){p.innerHTML='';p.style.display='none';}for(const id of ['lesson4PracticeExcel','lesson4PracticeTree'])if($(id))$(id).disabled=!lesson4PracticeValidSelection();}
+    function clearLesson4Practice(){clearTreeImage('practice');const preview=$("lesson4PracticePeriod");if(preview){try{const end=$("lesson4PracticeWakeEnd").value;lesson4Day(end);preview.textContent="기상일 "+lesson4Day(end,-27)+" ~ "+end+" / 분석일 "+lesson4Day(end,-28)+" ~ "+lesson4Day(end,-1)+" · 28일 가상 일정(실제 관측 아님)";}catch{preview.textContent="자료 종료일(기상일 기준)을 선택하세요.";}}lesson4PracticeExportToken=null;lesson4PracticeState={caseId:'',selectedWakeEnd:'',revision:lesson4PracticeState.revision+1,bundle:null,pending:null};const p=$('lesson4PracticePanel');if(p){p.innerHTML='';p.style.display='none';}for(const id of ['lesson4PracticeExcel','lesson4PracticeTree'])if($(id))$(id).disabled=!lesson4PracticeValidSelection();}
     function lesson4PracticeIsCurrent(bundle){return !!bundle&&lesson4PracticeState.bundle===bundle&&bundle.meta.caseId===$('lesson4PracticeSelect').value&&bundle.meta.selectedWakeEnd===$('lesson4PracticeWakeEnd').value;}
     async function currentLesson4PracticeBundle(){
       if(!lesson4PracticeValidSelection())throw new Error('가상 사례와 자료 종료일(기상일 기준)을 선택하세요.');
@@ -3896,7 +3897,7 @@ function researchCaffeineSheets(source, period) {
     function lesson4PracticeError(error){const p=$('lesson4PracticePanel');p.style.display='block';p.innerHTML='<p>'+escapeHtml(error.message)+'</p>';}
     async function drawLesson4PracticeTree(){const revision=lesson4PracticeState.revision;try{
       const bundle=await currentLesson4PracticeBundle();if(!lesson4PracticeIsCurrent(bundle))return;const m=bundle.meta,result=buildPracticeTree(bundle),tree=result.displayTree;
-      const panel=$('lesson4PracticePanel');panel.style.display='block';panel.innerHTML=`<h3>${escapeHtml(m.displayName)} · 가상 연습 나무</h3><p>가상 시나리오 일정이며 실제 관측치가 아닙니다. 연구·반별 집계 제외 · 인과관계 증명 아님.</p><p>자료 종료일(기상일 기준): ${m.wakeEnd}<br>기상일 ${m.wakeStart} ~ ${m.wakeEnd} / 분석일(기상일 전날) ${m.analysisStart} ~ ${m.analysisEnd}</p><p>동일 자료: ${escapeHtml(lesson4PracticeFileName(bundle))} · 28건, 컨디션 좋음 ${result.counts.good} / 그 외 ${result.counts.bad}</p><p>정책: ${result.policy} · 컨디션 4~5점=좋음. 가상 자료에만 방향 중립 기준을 사용하며 실제 자료의 기존 처리와 다릅니다. ${tree?.visualFallback?'관찰용: 엄격한 안정성 기준을 통과한 규칙이 아닙니다.':''}</p><p>${escapeHtml(treeTimeLegend())}</p>${tree?.leaf?'<p>안정적인 첫 질문이 발견되지 않았습니다. 두 결과가 섞인 기록도 함께 해석하세요.</p>':''}<div style="overflow:auto">${tree?renderTreeSvg(tree,nodeQuestion,false,true):''}</div><p style="overflow-wrap:anywhere">자료 SHA256: ${bundle.digest}</p><p>카페인 총량은 취침 전24시간 [취침−24h, 취침)입니다. 완결된 가상 목록에서만 시간창의 양수 섭취 기록 없음=0입니다. 실제 기록 결측을 0으로 채운 것이 아닙니다.</p>`;
+      const panel=$('lesson4PracticePanel');panel.style.display='block';panel.innerHTML=`<h3>${escapeHtml(m.displayName)} · 가상 연습 나무</h3><p>가상 시나리오 일정이며 실제 관측치가 아닙니다. 연구·반별 집계 제외 · 인과관계 증명 아님.</p><p>자료 종료일(기상일 기준): ${m.wakeEnd}<br>기상일 ${m.wakeStart} ~ ${m.wakeEnd} / 분석일(기상일 전날) ${m.analysisStart} ~ ${m.analysisEnd}</p><p>동일 자료: ${escapeHtml(lesson4PracticeFileName(bundle))} · 28건, 컨디션 좋음 ${result.counts.good} / 그 외 ${result.counts.bad}</p><p>정책: ${result.policy} · 컨디션 4~5점=좋음. 가상 자료에만 방향 중립 기준을 사용하며 실제 자료의 기존 처리와 다릅니다. ${tree?.visualFallback?'관찰용: 엄격한 안정성 기준을 통과한 규칙이 아닙니다.':''}</p><p>${escapeHtml(treeTimeLegend())}</p>${tree?.leaf?'<p>안정적인 첫 질문이 발견되지 않았습니다. 두 결과가 섞인 기록도 함께 해석하세요.</p>':''}<div style="overflow:auto">${tree?treeFigureHtml('practice',renderTreeSvg(tree,nodeQuestion,false,true,{title:m.displayName+' · 가상 자료',subtitle:m.analysisStart+' ~ '+m.analysisEnd+' · 날짜별 기록'}),m.displayName):''}</div><p style="overflow-wrap:anywhere">자료 SHA256: ${bundle.digest}</p><p>카페인 총량은 취침 전24시간 [취침−24h, 취침)입니다. 완결된 가상 목록에서만 시간창의 양수 섭취 기록 없음=0입니다. 실제 기록 결측을 0으로 채운 것이 아닙니다.</p>`;
     }catch(error){if(revision===lesson4PracticeState.revision)lesson4PracticeError(error);}}
     async function downloadLesson4PracticeExcel(){
       if(lesson4PracticeExportToken)return;const token={revision:lesson4PracticeState.revision};lesson4PracticeExportToken=token;$("lesson4PracticeExcel").disabled=true;
@@ -3966,7 +3967,7 @@ function researchCaffeineSheets(source, period) {
     function classroomBranchMeaning(feature,threshold,yes){if(feature==='일일카페인총량_mg')return '취침 전24h 기록기반 총량 '+threshold+'mg '+(yes?'초과':'이하');return treeTimeBranch(feature,threshold,yes);}
     function classroomReadingRows(m){const rows=[{항목:'모델 표시',내용:m.status==='observational'?'관찰용 치우침: 엄격한 안정성 기준 통과 아님':m.status==='strict'?'기존 엄격 기준 통과: 인과·예측성능 보장 아님':'분기 불가 또는 유효 기록 부족'},{항목:'같은 자료인가?',내용:'내 나무와 비교하기 전에 같은 반·분석 기간·입력 3개·유효 기록 건수인지 실제 화면의 수치를 확인합니다. 개인 기록과 반 통합 자료는 다릅니다.'},{항목:'점수와 시간',내용:treeTimeLegend()},{항목:'날짜별 기록',내용:m.rows.length+'건은 '+m.validStudents+'명의 반복 기록입니다. 학생 수가 아닙니다.'}];if(!m.tree||m.tree.leaf){rows.push({항목:'현재 결과',내용:m.status==='insufficient'?'유효한 날짜별 기록이 '+m.rows.length+'건으로 최소10건 미만입니다.':m.status==='one_label'?'목표 결과가 한 종류라 두 결과를 비교하는 질문을 만들지 않습니다.':'현재 3입력에서 표본·개선량 기준을 만족하는 분기를 찾지 못했습니다.'});return rows;}
       rows.push({항목:'첫 질문',내용:classroomNodeQuestion(m.tree.feature,m.tree.threshold)},{항목:'예 갈래',내용:classroomBranchMeaning(m.tree.feature,m.tree.threshold,true)+' → '+m.tree.yes.n+'건, 좋음 '+formatPercent(nodeGoodRate(m.tree.yes))},{항목:'아니오 갈래',내용:classroomBranchMeaning(m.tree.feature,m.tree.threshold,false)+' → '+m.tree.no.n+'건, 좋음 '+formatPercent(nodeGoodRate(m.tree.no))});
-      let index=0;function walk(node,path){if(node.leaf){rows.push({항목:'결과 '+(++index)+' (왼쪽 끝점부터)',내용:path.join(' → ')+' : '+node.n+'건 중 좋음 '+node.good+'건 / 그 외 '+node.bad+'건. 좋음 관찰 비율 '+formatPercent(nodeGoodRate(node))+'. 색/다수결은 이 끝점의 더 많은 결과이며 모두 같은 결과라는 뜻은 아닙니다.'});return;}walk(node.yes,[...path,'예: '+CLASSROOM_TREE_LABELS[node.feature]+' = '+classroomBranchMeaning(node.feature,node.threshold,true)]);walk(node.no,[...path,'아니오: '+CLASSROOM_TREE_LABELS[node.feature]+' = '+classroomBranchMeaning(node.feature,node.threshold,false)]);}walk(m.tree,[]);
+      let index=0;function walk(node,path){if(node.leaf){rows.push({항목:'결과 '+(++index)+' (왼쪽 끝점부터)',내용:path.join(' → ')+' : '+node.n+'건 중 좋음 '+node.good+'건 / 그 외 '+node.bad+'건. 좋음 관찰 비율 '+formatPercent(nodeGoodRate(node))+(node.good===node.bad?'. 좋음과 그 외가 동률이며 어느 쪽도 과반이 아닙니다. 기존 판정은 유지합니다.':'. 색/다수결은 이 끝점의 더 많은 결과이며 모두 같은 결과라는 뜻은 아닙니다.')});return;}walk(node.yes,[...path,'예: '+CLASSROOM_TREE_LABELS[node.feature]+' = '+classroomBranchMeaning(node.feature,node.threshold,true)]);walk(node.no,[...path,'아니오: '+CLASSROOM_TREE_LABELS[node.feature]+' = '+classroomBranchMeaning(node.feature,node.threshold,false)]);}walk(m.tree,[]);
       rows.push({항목:'내 나무와 비교',내용:'첫 요인과 질문 기준이 같은가? 같은 기록을 예/아니오로 따라가면 어느 끝점인가? 그 끝점의 기록수·좋음 비율과 예외는 어떻게 다른가?'},{항목:'활동 목표',내용:'목표는 수면질 전체가 아니라 기상 후 컨디션 4~5점 여부입니다. 좋았던 조건을 탐색 → 수면 지식과 대조 → 안전한 실천 가설 선택 → 다시 기록해 확인합니다. 이 비율은 미래 성공확률이나 행동 추천이 아닙니다. 작은 표본의 높은 비율은 우연일 수 있고, 카페인 섭취를 권하는 근거가 아닙니다.'},{항목:'주의',내용:'카페인 양수 쪽의 좋음 비율이 높게 나오는 역방향 패턴도 그대로 표시합니다. 카페인의 효과나 인과관계가 아니며, 같은 자료로 만든 나무의 분류 비율은 검증된 예측성능이 아닙니다.'});return rows;
     }
     function classroomInterpretationHtml(m){return '<section style="margin-top:12px;padding:14px;border:1px solid var(--line);background:#fffdf7"><h3>이 나무 읽기 · 내 나무와 비교</h3>'+classroomReadingRows(m).map(r=>'<p><b>'+escapeHtml(r.항목)+'</b> — '+escapeHtml(r.내용)+'</p>').join('')+'</section>';}
@@ -4285,80 +4286,38 @@ function researchCaffeineSheets(source, period) {
       }[ch]));
     }
 
-    function renderTreeSvg(root, question = nodeQuestion, classroom = false, roomy = classroom) {
-      const nodes = [];
-      const edges = [];
-      let leafIndex = 0;
-      function layout(node, depth, parent = null, branch = "") {
-        node.depth = depth;
-        if (node.leaf) {
-          node.x = leafIndex * 230 + 120;
-          leafIndex += 1;
-        } else {
-          layout(node.yes, depth + 1, node, "예");
-          layout(node.no, depth + 1, node, "아니오");
-          node.x = (node.no.x + node.yes.x) / 2;
-        }
-        node.y = depth * (roomy ? 185 : 140) + 30;
-        nodes.push(node);
-        if (parent) edges.push({ from: parent, to: node, label: branch });
-      }
-      layout(root, 0);
-      const maxX = Math.max(...nodes.map(node => node.x));
-      const width = Math.max(760, maxX + 140);
-      const height = Math.max(...nodes.map(node => node.y)) + (roomy ? 155 : 130);
-      const nodeMarkup = nodes.map(node => {
-        const boxW = node.leaf ? 190 : 280;
-        const boxH = roomy ? (node.leaf ? 136 : 130) : (node.leaf ? 112 : 92);
-        const x = node.x - boxW / 2;
-        const y = node.y;
-        const isGood = node.className === "컨디션 좋음";
-        const fill = node.leaf ? (isGood ? "#ecfdf3" : "#fffaeb") : "#eef9fb";
-        const stroke = node.leaf ? (isGood ? "var(--good)" : "var(--warn)") : "var(--brand)";
-        const color = node.leaf ? (isGood ? "var(--good)" : "var(--warn)") : "var(--ink)";
-        const unstable = node.n < 10 || (node.good > 0 && node.good < TREE_MIN_CLASS_N) || (node.bad > 0 && node.bad < TREE_MIN_CLASS_N);
-        const majClass = isGood ? "컨디션 좋음" : "그 외";
-        const majCount = isGood ? (node.good ?? 0) : (node.bad ?? 0);
-        const pureLeaf = (node.good ?? 0) === 0 || (node.bad ?? 0) === 0;
-        const title = node.leaf
-          ? (pureLeaf
-              ? `${isGood ? "😴 컨디션 좋음" : "⚠ 그 외"} · ${node.n}건 전부`
-              : `${isGood ? "🙂 컨디션 좋음" : "그 외"} · ${node.n}건 중 ${majClass} ${majCount}`)
-          : question(node.feature, node.threshold);
-        const detail = classroom && node.leaf ? `좋음 ${node.good ?? 0}/${node.n}건 · 관찰 비율 ${formatPercent(nodeGoodRate(node))} / 그 외 ${node.bad ?? 0}건${unstable ? " · 작은 표본 주의" : ""}` : `컨디션 좋음 ${node.good ?? 0}건 / 그 외 ${node.bad ?? 0}건${unstable ? " · 주의" : ""}`;
-        const gainText = node.leaf ? "" : `개선량 ${node.gain.toFixed(2)}`;
-        const branchText = node.leaf ? "" : `예 ${node.yes.n}건·컨디션 좋음 ${formatPercent(nodeGoodRate(node.yes))} / 아니오 ${node.no.n}건·컨디션 좋음 ${formatPercent(nodeGoodRate(node.no))}`;
-        const stopText = node.leaf && node.stopReason ? node.stopReason : "";
-        return `
-          <g>
-            <rect x="${x}" y="${y}" width="${boxW}" height="${boxH}" rx="8" fill="${fill}" stroke="${stroke}" stroke-width="2"></rect>
-            <foreignObject x="${x + 12}" y="${y + 9}" width="${boxW - 24}" height="${boxH - 18}">
-              <div xmlns="http://www.w3.org/1999/xhtml" style="height:100%; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; color:${color}; line-height:1.35; word-break:keep-all; overflow-wrap:anywhere;">
-                <div style="font-weight:800; font-size:13px;">${escapeHtml(title)}</div>
-                <div style="font-weight:700; font-size:11px; margin-top:4px; color:var(--muted);">${escapeHtml(detail)}</div>
-                ${gainText ? `<div style="font-weight:700; font-size:10px; margin-top:2px; color:var(--muted);">${escapeHtml(gainText)}</div>` : ""}
-                ${branchText ? `<div style="font-weight:700; font-size:10px; margin-top:2px; color:var(--muted);">${escapeHtml(branchText)}</div>` : ""}
-                ${stopText ? `<div style="font-weight:700; font-size:10px; margin-top:2px; color:var(--muted);">${escapeHtml(stopText)}</div>` : ""}
-              </div>
-            </foreignObject>
-          </g>`;
-      }).join("");
-      const edgeMarkup = edges.map(edge => {
-        const fromY = edge.from.y + (roomy ? 130 : (edge.from.leaf ? 96 : 92));
-        const toY = edge.to.y;
-        const midY = (fromY + toY) / 2;
-        const labelX = (edge.from.x + edge.to.x) / 2;
-        const labelY = midY - 6;
-        return `
-          <polyline points="${edge.from.x},${fromY} ${edge.from.x},${midY} ${edge.to.x},${midY} ${edge.to.x},${toY}" fill="none" stroke="var(--line)" stroke-width="2"></polyline>
-          <text x="${labelX}" y="${labelY}" text-anchor="middle" fill="var(--muted)" font-size="12" font-weight="700">${edge.label}</text>`;
-      }).join("");
-      return `
-        <svg viewBox="0 0 ${width} ${height}" width="100%" role="img" aria-label="AI가 찾은 임시 규칙 나무">
-          ${edgeMarkup}
-          ${nodeMarkup}
-        </svg>`;
+    const treeImageState={real:null,practice:null};
+    let treeImageSerial=0;
+    function clearTreeImage(scope){treeImageState[scope]=null;treeImageSerial+=1;}
+    function treeImageCondition(node,yes){
+      if(['취침전스마트폰_점수','신체활동_점수'].includes(node.feature))return treeTimeBranch(node.feature,node.threshold,yes);
+      if(node.feature==='일일카페인총량_mg')return '취침 전24h 기록 총량 '+node.threshold+'mg '+(yes?'초과':'이하');
+      return branchLabel(node,yes);
     }
+    function treeImageWrap(text,width,size){const result=[],weight=s=>Array.from(s).reduce((n,c)=>n+size*(c===' '?0.4:/[\u0000-\u007f]/.test(c)?(/[MW@%]/.test(c)?0.95:0.68):1.08),0);for(const paragraph of String(text??'').split('\n')){let line='';for(const word of paragraph.split(/\s+/).filter(Boolean)){const candidate=line?line+' '+word:word;if(weight(candidate)<=width){line=candidate;continue;}if(line){result.push(line);line='';}if(weight(word)<=width){line=word;continue;}for(const char of Array.from(word)){if(line&&weight(line+char)>width){result.push(line);line='';}line+=char;}}if(line)result.push(line);}return result.length?result:[''];}
+    function treeSvgText(lines,x,y,size=16,color='#172033',weight=400,anchor='start'){return `<text x="${x}" y="${y}" text-anchor="${anchor}" font-size="${size}" font-weight="${weight}" fill="${color}">${lines.map((s,i)=>`<tspan x="${x}" dy="${i?Math.ceil(size*1.45):0}">${escapeHtml(s)}</tspan>`).join('')}</text>`;}
+    function renderTreeSvg(root,question=nodeQuestion,classroom=false,roomy=classroom,context={}){
+      if(!root)return '';const records=[],edges=[],levelH=[],gap=[],positions=new Map();let leaf=0;
+      function collect(node,depth){let x;if(node.leaf)x=leaf++*480;else{x=(collect(node.yes,depth+1)+collect(node.no,depth+1))/2;edges.push({from:node,to:node.yes,yes:true},{from:node,to:node.no,yes:false});}const n=Number(node.n)||0,g=Number(node.good)||0,b=Number(node.bad)||0,tie=g===b&&n>0,small=n<10||(g>0&&g<TREE_MIN_CLASS_N)||(b>0&&b<TREE_MIN_CLASS_N),width=node.leaf?380:420;
+        const title=node.leaf?(n===0?'기록 없음 · 분기 없음':tie?'끝점 · 동률':`끝점 · ${node.className||'기록 요약'}`):question(node.feature,node.threshold);
+        const blocks=[{text:title,size:18,bold:true},{text:`좋음 ${g}/${n}건 · 그 외 ${b}건`,size:16,bold:true},{text:n?`좋음 관찰 비율 ${formatPercent(g/n)}`:'관찰 비율 계산 불가 (분모 0)',size:16,bold:true}];
+        if(node.leaf){blocks.push({text:tie?`좋음과 그 외가 같은 건수입니다. 어느 쪽도 과반이 아닙니다. 기존 판정: ${node.className||'그 외'}`:`이 조건의 모든 ${n}건 중 기상 후 컨디션 4~5점인 기록이 ${g}건입니다.`,size:14});if(node.stopReason)blocks.push({text:node.stopReason,size:12,color:'#667085'});}else{blocks.push({text:`이곳의 좋음 ${g}건과 그 외 ${b}건, 모든 기록을 아래 행동 조건으로 다시 나눕니다.`,size:14});blocks.push({text:`분리 개선량 ${Number(node.gain||0).toFixed(2)}`,size:12,color:'#667085'});}if(small)blocks.push({text:'작은 표본·결과 편중 주의',size:12,color:'#9a3412'});
+        let height=30;for(const block of blocks){block.lines=treeImageWrap(block.text,width-36,block.size);height+=block.lines.length*Math.ceil(block.size*1.45)+8;}const p={node,depth,x,width,height,blocks,tie};records.push(p);positions.set(node,p);levelH[depth]=Math.max(levelH[depth]||0,height);return x;}
+      collect(root,0);const width=Math.max(1000,leaf*480+80),offset=(width-(leaf-1)*480)/2;
+      for(const e of edges){e.lines=treeImageWrap((e.yes?'예 · ':'아니오 · ')+treeImageCondition(e.from,e.yes),410,14);gap[positions.get(e.to).depth]=Math.max(gap[positions.get(e.to).depth]||150,e.lines.length*21+75);}
+      const header=[{text:context.title||'AI 나무 · 날짜별 기록',size:22,bold:true},{text:(context.subtitle||'')+(context.subtitle?' · ':'')+(root.leaf?'분기 없음':root.visualFallback?'관찰용 · 엄격 기준 통과 아님':'엄격 기준의 임시 규칙'),size:14},{text:'예/아니오 = 질문의 행동 조건에 해당/해당하지 않음. 컨디션 좋음/나쁨 판정이 아닙니다.',size:15,bold:true},{text:'다음 질문은 해당 가지의 좋음·그 외 모든 기록을 다시 분류합니다.',size:15}];let top=36;let head='';for(const block of header){const lines=treeImageWrap(block.text,width-80,block.size);head+=treeSvgText(lines,40,top,block.size,'#172033',block.bold?700:400);top+=lines.length*Math.ceil(block.size*1.45)+12;}top+=16;const ys=[top];for(let d=1;d<levelH.length;d++)ys[d]=ys[d-1]+levelH[d-1]+gap[d];for(const p of records){p.x+=offset;p.y=ys[p.depth];}
+      let graph='';for(const e of edges){const a=positions.get(e.from),b=positions.get(e.to),bottom=a.y+a.height,joint=bottom+18,labelY=joint+16,labelH=e.lines.length*21+12;graph+=`<path d="M${a.x} ${bottom} V${joint} H${b.x} V${b.y}" fill="none" stroke="#b8c5d8" stroke-width="2"/><rect x="${b.x-223}" y="${labelY}" width="446" height="${labelH}" rx="6" fill="#ffffff" stroke="#d8dee9"/>`+treeSvgText(e.lines,b.x,labelY+20,14,'#344054',600,'middle');}
+      for(const p of records){const good=p.node.className==='컨디션 좋음',fill=!p.node.leaf?'#eef9fb':p.tie?'#f1f5f9':good?'#ecfdf3':'#fffaeb',stroke=!p.node.leaf?'#176b87':p.tie?'#64748b':good?'#027a48':'#b54708';graph+=`<g data-tree-node="true"><rect x="${p.x-p.width/2}" y="${p.y}" width="${p.width}" height="${p.height}" rx="10" fill="${fill}" stroke="${stroke}" stroke-width="2"/>`;let y=p.y+27;for(const block of p.blocks){graph+=treeSvgText(block.lines,p.x,y,block.size,block.color||'#172033',block.bold?700:400,'middle');y+=block.lines.length*Math.ceil(block.size*1.45)+8;}graph+='</g>';}
+      let footerY=Math.max(...records.map(p=>p.y+p.height))+40;const footer=[treeTimeLegend(),'표본은 학생 수가 아닌 날짜별 반복 기록입니다. 좋음은 기상 후 컨디션 4~5점이며 수면질 전체가 아닙니다.','관찰 비율은 인과 효과·미래 성공확률·최적 행동 추천이 아닙니다.'];let foot='';for(const s of footer){const lines=treeImageWrap(s,width-80,14);foot+=treeSvgText(lines,40,footerY,14,'#475467');footerY+=lines.length*21+10;}const height=footerY+20;
+      return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" width="${width}" height="${height}" style="display:block;width:100%;height:auto" role="img" aria-label="행동 조건과 관찰 비율을 함께 읽는 AI 나무" font-family="Malgun Gothic, Noto Sans KR, Segoe UI, sans-serif"><rect width="${width}" height="${height}" fill="#ffffff"/>${head}${graph}${foot}</svg>`;
+    }
+    function treeFigureHtml(scope,svg,label){const snapshot={scope,svg,label,serial:++treeImageSerial};treeImageState[scope]=snapshot;return `<div data-tree-figure="${scope}" style="overflow:auto">${svg}</div><div data-tree-controls style="display:flex;gap:8px;flex-wrap:wrap;margin:12px 0"><button id="${scope}TreeCopy" type="button" class="secondary" onclick="copyTreeImage('${scope}')">그림 복사 (PNG)</button><button id="${scope}TreePng" type="button" class="secondary" onclick="downloadTreeImage('${scope}')">PNG 다운로드</button><button type="button" class="secondary" onclick="printTreeImage('${scope}')">그림 인쇄</button><span id="${scope}TreeImageStatus" role="status" aria-live="polite"></span></div>`;}
+    function treeImageStatus(scope,text){const el=$(scope+'TreeImageStatus');if(el)el.textContent=text;}
+    async function treeImagePng(snapshot){if(treeImageState[snapshot.scope]!==snapshot)throw new Error('선택이 바뀌었습니다. 그림을 다시 생성하세요.');const url=URL.createObjectURL(new Blob([snapshot.svg],{type:'image/svg+xml;charset=utf-8'}));try{const img=new Image();await new Promise((resolve,reject)=>{img.onload=resolve;img.onerror=()=>reject(new Error('그림 변환 실패'));img.src=url;});if(treeImageState[snapshot.scope]!==snapshot)throw new Error('선택이 바뀌었습니다.');const canvas=document.createElement('canvas'),scale=Math.min(2,4096/img.naturalWidth);canvas.width=Math.ceil(img.naturalWidth*scale);canvas.height=Math.ceil(img.naturalHeight*scale);const ctx=canvas.getContext('2d');if(!ctx)throw new Error('PNG 변환을 지원하지 않습니다.');ctx.fillStyle='#fff';ctx.fillRect(0,0,canvas.width,canvas.height);ctx.drawImage(img,0,0,canvas.width,canvas.height);const blob=await new Promise((resolve,reject)=>canvas.toBlob(b=>b?resolve(b):reject(new Error('PNG 생성 실패')),'image/png'));if(treeImageState[snapshot.scope]!==snapshot)throw new Error('선택이 바뀌었습니다.');return blob;}finally{URL.revokeObjectURL(url);}}
+    async function copyTreeImage(scope){const snapshot=treeImageState[scope];if(!snapshot)return;treeImageStatus(scope,'PNG를 준비하고 있습니다…');const button=$(scope+'TreeCopy');if(button)button.disabled=true;try{if(typeof navigator==='undefined'||!navigator.clipboard?.write||typeof ClipboardItem==='undefined')throw new Error('이 브라우저는 그림 복사를 지원하지 않습니다.');const png=treeImagePng(snapshot);png.catch(()=>{});await navigator.clipboard.write([new ClipboardItem({'image/png':png})]);if(treeImageState[scope]===snapshot)treeImageStatus(scope,'그림을 복사했습니다. Google Docs/Slides에 붙여넣으세요.');}catch(error){if(treeImageState[scope]===snapshot)treeImageStatus(scope,'복사하지 못했습니다. PNG 다운로드를 이용하세요. '+(error.name==='NotAllowedError'?'클립보드 쓰기가 허용되지 않았습니다.':error.message));}finally{if(treeImageState[scope]===snapshot&&button)button.disabled=false;}}
+    async function downloadTreeImage(scope){const snapshot=treeImageState[scope];if(!snapshot)return;treeImageStatus(scope,'PNG를 준비하고 있습니다…');try{const blob=await treeImagePng(snapshot);if(treeImageState[scope]!==snapshot)return;saveLesson3Blob(blob,'4차시_'+safeFileName(snapshot.label)+'_AI나무_해석포함.png');treeImageStatus(scope,'PNG 다운로드를 시작했습니다.');}catch(error){if(treeImageState[scope]===snapshot)treeImageStatus(scope,error.message);}}
+    function treeImagePrintHtml(snapshot){return `<!doctype html><html lang="ko"><head><meta charset="utf-8"><title>${escapeHtml(snapshot.label)} AI 나무</title><style>@page{size:landscape;margin:10mm}body{margin:0;background:white}svg{display:block;width:100%;height:auto;max-height:185mm;break-inside:avoid}</style></head><body>${snapshot.svg}</body></html>`;}
+    function printTreeImage(scope){const snapshot=treeImageState[scope];if(!snapshot)return;const win=window.open('','_blank');if(!win){treeImageStatus(scope,'인쇄 창을 열지 못했습니다. PNG 다운로드를 이용하세요.');return;}win.document.open();win.document.write(treeImagePrintHtml(snapshot));win.document.close();win.focus();win.print();}
 
     function treePanelMessage(message) {
       return `
@@ -4400,6 +4359,9 @@ function researchCaffeineSheets(source, period) {
     function drawAiTree() {
       if (!classroomTreeReady()) return;
       const model=classroomTreeModel();updateClassroomTreeButtons();
+      clearTreeImage("real");
+      const context={title:treeTargetLabel()+" · 수업용 3입력",subtitle:model.actualPeriod+" · 날짜별 기록"};
+      const figure=tree=>treeFigureHtml("real",renderTreeSvg(tree,classroomNodeQuestion,true,true,context),treeTargetLabel());
       const panel = $("treePanel");
       const rows = model.rows;
       const modeStats = treeModeStats(rows);
@@ -4412,14 +4374,14 @@ function researchCaffeineSheets(source, period) {
         alarmHtml = treeAlarmBox(`이 반의 '컨디션 좋음' 기록은 ${goodCount}건뿐이라 트리가 한쪽으로 치우칠 수 있어요. 기준을 바꾸지 말고, '컨디션 좋은 기록이 적다'는 점도 함께 해석하세요.`);
       }
       if (rows.length < 10) {
-        panel.innerHTML = alarmHtml + treePanelMessage(`트리를 그리려면 유효한 날짜별 기록이 10개 이상 필요해요. 현재 ${rows.length}건입니다.`);
+        panel.innerHTML = alarmHtml + treePanelMessage(`트리를 그리려면 유효한 날짜별 기록이 10개 이상 필요해요. 현재 ${rows.length}건입니다.`) + figure(makeLeaf(rows,"최소 유효 기록 수를 충족하지 못해 분기하지 않았습니다."));
         return;
       }
       const tree = model.strictTree;
       const visualTree = model.tree?.visualFallback ? model.tree : null;
       const displayTree = visualTree || tree;
       if (!displayTree || displayTree.leaf) {
-        panel.innerHTML = alarmHtml + treePanelMessage(model.status==='one_label'?'컨디션 목표 결과가 한 종류뿐이라 비교할 질문을 만들지 않았습니다.':'현재 3입력에서 표본 수·개선량 기준을 만족하는 질문을 찾지 못했습니다.') + classroomInterpretationHtml(model);
+        panel.innerHTML = alarmHtml + treePanelMessage(model.status==='one_label'?'컨디션 목표 결과가 한 종류뿐이라 비교할 질문을 만들지 않았습니다.':'현재 3입력에서 표본 수·개선량 기준을 만족하는 질문을 찾지 못했습니다.') + figure(displayTree||makeLeaf(rows,"분기를 만들지 않았습니다.")) + classroomInterpretationHtml(model);
         return;
       }
       const fallbackNotice = displayTree.visualFallback
@@ -4432,7 +4394,7 @@ function researchCaffeineSheets(source, period) {
           ${fallbackNotice}
           <div style="font-weight:800; color:var(--ink); margin-bottom:6px;">${displayTree.visualFallback ? "AI가 표시한 관찰용 치우침 나무" : "AI가 찾은 임시 규칙 나무"} — ${escapeHtml(treeTargetLabel())} · ${escapeHtml("수업용 3입력")} · 표본 ${rows.length}건</div>
           <div style="font-size:12px; color:var(--muted); margin-bottom:10px;">${escapeHtml("취침 전24시간 기록기반 카페인 총량 · 스마트폰 · 신체활동만 사용. 빈칸 제외/명시적0mg 포함. 표본은 날짜별 반복 기록이며 학생 수가 아닙니다.")} 0mg 기록 ${modeStats.zero}건, 1mg 이상 섭취 기록 ${modeStats.intake}건.</div>
-          ${renderTreeSvg(displayTree,classroomNodeQuestion,true)}
+          ${figure(displayTree)}
           ${classroomInterpretationHtml(model)}
           ${treeFinalNotice(displayTree, rows, true)}
         </div>`;
@@ -4895,6 +4857,7 @@ function researchCaffeineSheets(source, period) {
     $("classSelectCompare").addEventListener("change", populateCompareStudentSelect);
     $("studentCompareSelect").addEventListener("change", updateBeforeAfterButtons);
     const resetTreePanel = () => {
+      clearTreeImage("real");
       if ($("treePanel")) {
         $("treePanel").style.display = "none";
         $("treePanel").innerHTML = "";
