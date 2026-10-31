@@ -366,7 +366,7 @@
   <header>
     <h1>교사용 카페인·수면 분석자료 생성기 v73</h1>
     <p>교사가 카페인·수면 원자료를 넣으면, 학생 활동에 사용할 반별·개인별 분석 데이터와 AI 분석용 CSV를 자동 생성합니다.</p>
-    <p id="publication-update">최근 반영: 2026-10-31T22:08:41Z (UTC). 4차시 실제 반 분석은 취침 전24시간 기록기반 카페인 총량·스마트폰·신체활동 3입력을 사용합니다. 반별·전체의 유효/제외 건수와 엄격/관찰용 구분, 질문·끝점 관찰 비율의 읽기 안내를 확인하세요. CSV·해석 요약표의 수업용_AI입력은 같은 AI 자료입니다. 연구용·다른 차시·TEST00·가상 사례 처리는 유지합니다. 이전 화면이 보이면 파일 선택 전에 Ctrl+F5로 새로고침하세요.</p>
+    <p id="publication-update">최근 반영: 2026-10-31T22:26:55Z (UTC). 4차시 나무의 스마트폰·신체활동 질문과 해설에 점수와 시간을 함께 표시합니다. 1점=안 함, 2점=30분 미만, 3점=30~60분, 4점=60분 이상입니다. 실제 반·전체·가상 사례의 표시를 맞췄으며 데이터·모델·임계값·가상 C의 생성규칙은 그대로입니다. 이전 화면이 보이면 파일 선택 전에 Ctrl+F5로 새로고침하세요.</p>
   </header>
 
   <main>
@@ -3848,7 +3848,7 @@ function researchCaffeineSheets(source, period) {
       });
       const {wb}=buildLesson4WorkbookFromModel({myRows,info,episodeRows:bundle.analysisRows,sid:info.익명ID});
       const guide=wb.Sheets['활동안내'];for(const cell of Object.values(guide))if(typeof cell?.v==='string'){cell.v=cell.v.replace('이 파일은 4차시 개인 데이터 분석 활동용입니다.','이 파일은 내장 가상 인물의 4차시 연습 자료입니다. 실제 학생 관측치가 아닙니다.').replace('3. 반평균_비교 시트에서 내 기록이 반 평균과 비슷한지 다른지 확인합니다.','3. 가상 인물에는 반 평균이 없습니다. 반평균_비교의 빈칸을 0으로 채우지 않습니다.');}
-      const rows=[['자료 구분','lesson4-fictional'],['사례',meta.displayName],['사례 ID/버전',meta.caseId+' / '+meta.caseVersion],['자료 종료일(기상일 기준)',meta.wakeEnd],['기상일 범위',meta.wakeStart+' ~ '+meta.wakeEnd],['분석일 범위(기상일 전날)',meta.analysisStart+' ~ '+meta.analysisEnd],['가상 일정','선택한 날짜로 옮긴 가상 시나리오이며 실제 관측치가 아닙니다. 미래 일정도 연습용으로만 허용합니다.'],['동일 자료 확인 SHA256',bundle.digest],['AI 정책',meta.policy],['목표','컨디션 4~5점=좋음 / 1~3점=그 외. 인과관계 증명 아님.'],['완결성','가상 목록을 빠짐없이 작성한 시간창만 양수 기록 없음=0. 실제 기록 결측은 그대로 보존합니다.'],['카페인 기준','취침 전24시간 [취침−24h, 취침), 4/6/8/12h도 시작 포함·끝 제외.'],['AI 시간대 여부','오전 <15시 / 오후15~18시 / 저녁18시 이후. 3차시 여섯 시간대와 다른 지표.'],['연습 방법','개인_일별자료·그래프용으로 살펴본 뒤 같은 사례·종료일의 AI 나무와 비교하세요.'],['반 평균','가상 인물의 반 평균은 없습니다. 빈칸은0이 아닙니다.'],['주의','연구·실제 반별 자료와 혼합하지 않습니다. 이 파일을 원자료로 업로드하지 않습니다.']];
+      const rows=[['자료 구분','lesson4-fictional'],['사례',meta.displayName],['사례 ID/버전',meta.caseId+' / '+meta.caseVersion],['자료 종료일(기상일 기준)',meta.wakeEnd],['기상일 범위',meta.wakeStart+' ~ '+meta.wakeEnd],['분석일 범위(기상일 전날)',meta.analysisStart+' ~ '+meta.analysisEnd],['가상 일정','선택한 날짜로 옮긴 가상 시나리오이며 실제 관측치가 아닙니다. 미래 일정도 연습용으로만 허용합니다.'],['동일 자료 확인 SHA256',bundle.digest],['AI 정책',meta.policy+' · '+treeTimeLegend()],['목표','컨디션 4~5점=좋음 / 1~3점=그 외. 인과관계 증명 아님.'],['완결성','가상 목록을 빠짐없이 작성한 시간창만 양수 기록 없음=0. 실제 기록 결측은 그대로 보존합니다.'],['카페인 기준','취침 전24시간 [취침−24h, 취침), 4/6/8/12h도 시작 포함·끝 제외.'],['AI 시간대 여부','오전 <15시 / 오후15~18시 / 저녁18시 이후. 3차시 여섯 시간대와 다른 지표.'],['연습 방법','개인_일별자료·그래프용으로 살펴본 뒤 같은 사례·종료일의 AI 나무와 비교하세요.'],['반 평균','가상 인물의 반 평균은 없습니다. 빈칸은0이 아닙니다.'],['주의','연구·실제 반별 자료와 혼합하지 않습니다. 이 파일을 원자료로 업로드하지 않습니다.']];
       appendSleepFormattedSheet(wb,XLSX.utils.aoa_to_sheet([['항목','내용'],...rows]),'가상자료_안내');
       appendSleepFormattedSheet(wb,XLSX.utils.aoa_to_sheet([['분석일',...treeColumns,'가상기록ID'],...bundle.analysisRows.map((r,i)=>[r.분석일,...treeColumns.map(k=>bundle.treeRows[i][k]),r.가상기록ID])]),'AI연습_입력');
       wb.SheetNames=['가상자료_안내',...wb.SheetNames.filter(n=>n!=='가상자료_안내')];
@@ -3856,6 +3856,7 @@ function researchCaffeineSheets(source, period) {
       for(const name of ['개인_일별자료','수면기록_상태']){const ws=wb.Sheets[name];ws['!rows']=ws['!rows']||[];for(const [address,cell]of Object.entries(ws)){if(address.startsWith('!'))continue;const pos=XLSX.utils.decode_cell(address);if(pos.r>0){cell.s={...(cell.s||{}),alignment:{wrapText:typeof cell.v==='string',vertical:'top'}};ws['!rows'][pos.r]={hpt:48};}}}
 
       const notice=wb.Sheets['가상자료_안내'];notice['!cols']=[{wch:32},{wch:94}];notice['!rows']=[];for(const [a,c]of Object.entries(notice))if(!a.startsWith('!')){c.s={alignment:{wrapText:true,vertical:'top'}};notice['!rows'][XLSX.utils.decode_cell(a).r]={hpt:42};}
+      notice['!rows'][9]={hpt:96};
       for(const name of ['개인_일별자료','반평균_비교','그래프용','AI연습_입력','수면기록_상태'])if(wb.Sheets[name]){const ws=wb.Sheets[name],range=XLSX.utils.decode_range(ws['!ref']);ws['!cols']=Array.from({length:range.e.c+1},(_,i)=>({wch:i===0?14:22}));ws['!rows']=[{hpt:48}];for(let c=0;c<=range.e.c;c++){const cell=ws[XLSX.utils.encode_cell({r:0,c})];if(cell)cell.s={...(cell.s||{}),font:{bold:true},alignment:{wrapText:true,vertical:'top'}};}}
       for(const name of ['개인_일별자료','수면기록_상태']){const ws=wb.Sheets[name],range=XLSX.utils.decode_range(ws['!ref']);for(let c=0;c<=range.e.c;c++){const head=ws[XLSX.utils.encode_cell({r:0,c})]?.v||'';if(String(head).includes('집계구간')||String(head).includes('실제취침시각')||String(head).includes('실제기상시각'))ws['!cols'][c]={wch:52};}for(let r=1;r<=range.e.r;r++)ws['!rows'][r]={hpt:48};}
       wb.Sheets['AI연습_입력']['!cols'][14]={wch:46};
@@ -3895,7 +3896,7 @@ function researchCaffeineSheets(source, period) {
     function lesson4PracticeError(error){const p=$('lesson4PracticePanel');p.style.display='block';p.innerHTML='<p>'+escapeHtml(error.message)+'</p>';}
     async function drawLesson4PracticeTree(){const revision=lesson4PracticeState.revision;try{
       const bundle=await currentLesson4PracticeBundle();if(!lesson4PracticeIsCurrent(bundle))return;const m=bundle.meta,result=buildPracticeTree(bundle),tree=result.displayTree;
-      const panel=$('lesson4PracticePanel');panel.style.display='block';panel.innerHTML=`<h3>${escapeHtml(m.displayName)} · 가상 연습 나무</h3><p>가상 시나리오 일정이며 실제 관측치가 아닙니다. 연구·반별 집계 제외 · 인과관계 증명 아님.</p><p>자료 종료일(기상일 기준): ${m.wakeEnd}<br>기상일 ${m.wakeStart} ~ ${m.wakeEnd} / 분석일(기상일 전날) ${m.analysisStart} ~ ${m.analysisEnd}</p><p>동일 자료: ${escapeHtml(lesson4PracticeFileName(bundle))} · 28건, 컨디션 좋음 ${result.counts.good} / 그 외 ${result.counts.bad}</p><p>정책: ${result.policy} · 컨디션 4~5점=좋음. 가상 자료에만 방향 중립 기준을 사용하며 실제 자료의 기존 처리와 다릅니다. ${tree?.visualFallback?'관찰용: 엄격한 안정성 기준을 통과한 규칙이 아닙니다.':''}</p>${tree?.leaf?'<p>안정적인 첫 질문이 발견되지 않았습니다. 두 결과가 섞인 기록도 함께 해석하세요.</p>':''}<div style="overflow:auto">${tree?renderTreeSvg(tree):''}</div><p style="overflow-wrap:anywhere">자료 SHA256: ${bundle.digest}</p><p>카페인 총량은 취침 전24시간 [취침−24h, 취침)입니다. 완결된 가상 목록에서만 시간창의 양수 섭취 기록 없음=0입니다. 실제 기록 결측을 0으로 채운 것이 아닙니다.</p>`;
+      const panel=$('lesson4PracticePanel');panel.style.display='block';panel.innerHTML=`<h3>${escapeHtml(m.displayName)} · 가상 연습 나무</h3><p>가상 시나리오 일정이며 실제 관측치가 아닙니다. 연구·반별 집계 제외 · 인과관계 증명 아님.</p><p>자료 종료일(기상일 기준): ${m.wakeEnd}<br>기상일 ${m.wakeStart} ~ ${m.wakeEnd} / 분석일(기상일 전날) ${m.analysisStart} ~ ${m.analysisEnd}</p><p>동일 자료: ${escapeHtml(lesson4PracticeFileName(bundle))} · 28건, 컨디션 좋음 ${result.counts.good} / 그 외 ${result.counts.bad}</p><p>정책: ${result.policy} · 컨디션 4~5점=좋음. 가상 자료에만 방향 중립 기준을 사용하며 실제 자료의 기존 처리와 다릅니다. ${tree?.visualFallback?'관찰용: 엄격한 안정성 기준을 통과한 규칙이 아닙니다.':''}</p><p>${escapeHtml(treeTimeLegend())}</p>${tree?.leaf?'<p>안정적인 첫 질문이 발견되지 않았습니다. 두 결과가 섞인 기록도 함께 해석하세요.</p>':''}<div style="overflow:auto">${tree?renderTreeSvg(tree,nodeQuestion,false,true):''}</div><p style="overflow-wrap:anywhere">자료 SHA256: ${bundle.digest}</p><p>카페인 총량은 취침 전24시간 [취침−24h, 취침)입니다. 완결된 가상 목록에서만 시간창의 양수 섭취 기록 없음=0입니다. 실제 기록 결측을 0으로 채운 것이 아닙니다.</p>`;
     }catch(error){if(revision===lesson4PracticeState.revision)lesson4PracticeError(error);}}
     async function downloadLesson4PracticeExcel(){
       if(lesson4PracticeExportToken)return;const token={revision:lesson4PracticeState.revision};lesson4PracticeExportToken=token;$("lesson4PracticeExcel").disabled=true;
@@ -3930,6 +3931,16 @@ function researchCaffeineSheets(source, period) {
       return {...row, 일일카페인총량_mg: row.카페인기록총량_mg};
     }
 
+    // Score encoding is retained; only its displayed time-choice meaning is expanded.
+    function treeTimeScores(threshold,yes=true){return [1,2,3,4].filter(score=>yes?score>threshold:score<=threshold);}
+    function treeTimeScoreRange(scores){return scores.length===1?scores[0]+'점':scores[0]+'~'+scores.at(-1)+'점';}
+    function treeTimeQuestion(feature,threshold){
+      const phone=feature==='취침전스마트폰_점수',scores=treeTimeScores(threshold),range=treeTimeScoreRange(scores),time=scores[0]===2?(phone?'사용함':'활동함'):scores[0]===3?'30분 이상':'60분 이상';
+      return (phone?'취침 전 스마트폰':'신체활동')+' 점수가 '+range+'인가요? ('+time+')';
+    }
+    function treeTimeBranch(feature,threshold,yes){const scores=treeTimeScores(threshold,yes),labels=['안 함','30분 미만','30~60분','60분 이상'];return (feature==='취침전스마트폰_점수'?'취침 전 스마트폰':'신체활동')+' '+treeTimeScoreRange(scores)+' ('+scores.map(s=>labels[s-1]).join(' / ')+')';}
+    function treeTimeLegend(){return '스마트폰·신체활동 시간 선택지: 1점=안 함, 2점=30분 미만, 3점=30~60분, 4점=60분 이상. 점수는 응답 범주이며 실제 분 단위 측정값이 아닙니다.';}
+
     // Real classroom-only views; research/preprocess and fictional datasets keep their inputs.
     const CLASSROOM_TREE_FEATURES=Object.freeze(['일일카페인총량_mg','취침전스마트폰_점수','신체활동_점수']);
     const CLASSROOM_TREE_LABELS={'일일카페인총량_mg':'취침 전24시간 기록기반 카페인 총량(mg)','취침전스마트폰_점수':'취침 전 스마트폰 사용 범주','신체활동_점수':'신체활동 범주','컨디션좋음여부':'기상 후 컨디션 목표'};
@@ -3950,11 +3961,10 @@ function researchCaffeineSheets(source, period) {
     function updateClassroomTreeButtons(){const ready=!!state&&!state.identityWarnings?.length&&!lesson3DatesDirty();for(const id of ['treeDraw','downloadCsv','downloadAiSummary'])if($(id))$(id).disabled=!ready;const panel=$('classroomTreeDiagnostics');if(panel)panel.innerHTML=ready?classroomDiagnosticHtml(classroomTreeModel()):state&&lesson3DatesDirty()?'<p>분석 기간이 바뀌었습니다. 전처리를 다시 실행해야 AI 입력·기간이 반영됩니다.</p>':'';}
     function classroomNodeQuestion(feature,threshold){
       if(feature==='일일카페인총량_mg')return '취침 전24h 기록 카페인이 '+threshold+'mg 초과인가요?';
-      const item=feature==='취침전스마트폰_점수'?'스마트폰':'신체활동',cut=Math.floor(threshold)+1;
-      return cut<=2?(feature==='취침전스마트폰_점수'?'취침 전 스마트폰을 사용했나요?':'신체활동을 했나요?')+' (안 함 제외)':item+' 시간이 '+(cut===3?'30분 이상':'60분 이상')+' 범주인가요?';
+      return treeTimeQuestion(feature,threshold);
     }
-    function classroomBranchMeaning(feature,threshold,yes){if(feature==='일일카페인총량_mg')return '취침 전24h 기록기반 총량 '+threshold+'mg '+(yes?'초과':'이하');const labels=['안 함','30분 미만','30~60분','60분 이상'];return labels.filter((_,i)=>yes?i+1>threshold:i+1<=threshold).join(' / ');}
-    function classroomReadingRows(m){const rows=[{항목:'모델 표시',내용:m.status==='observational'?'관찰용 치우침: 엄격한 안정성 기준 통과 아님':m.status==='strict'?'기존 엄격 기준 통과: 인과·예측성능 보장 아님':'분기 불가 또는 유효 기록 부족'},{항목:'같은 자료인가?',내용:'내 나무와 비교하기 전에 같은 반·분석 기간·입력 3개·유효 기록 건수인지 실제 화면의 수치를 확인합니다. 개인 기록과 반 통합 자료는 다릅니다.'},{항목:'날짜별 기록',내용:m.rows.length+'건은 '+m.validStudents+'명의 반복 기록입니다. 학생 수가 아닙니다.'}];if(!m.tree||m.tree.leaf){rows.push({항목:'현재 결과',내용:m.status==='insufficient'?'유효한 날짜별 기록이 '+m.rows.length+'건으로 최소10건 미만입니다.':m.status==='one_label'?'목표 결과가 한 종류라 두 결과를 비교하는 질문을 만들지 않습니다.':'현재 3입력에서 표본·개선량 기준을 만족하는 분기를 찾지 못했습니다.'});return rows;}
+    function classroomBranchMeaning(feature,threshold,yes){if(feature==='일일카페인총량_mg')return '취침 전24h 기록기반 총량 '+threshold+'mg '+(yes?'초과':'이하');return treeTimeBranch(feature,threshold,yes);}
+    function classroomReadingRows(m){const rows=[{항목:'모델 표시',내용:m.status==='observational'?'관찰용 치우침: 엄격한 안정성 기준 통과 아님':m.status==='strict'?'기존 엄격 기준 통과: 인과·예측성능 보장 아님':'분기 불가 또는 유효 기록 부족'},{항목:'같은 자료인가?',내용:'내 나무와 비교하기 전에 같은 반·분석 기간·입력 3개·유효 기록 건수인지 실제 화면의 수치를 확인합니다. 개인 기록과 반 통합 자료는 다릅니다.'},{항목:'점수와 시간',내용:treeTimeLegend()},{항목:'날짜별 기록',내용:m.rows.length+'건은 '+m.validStudents+'명의 반복 기록입니다. 학생 수가 아닙니다.'}];if(!m.tree||m.tree.leaf){rows.push({항목:'현재 결과',내용:m.status==='insufficient'?'유효한 날짜별 기록이 '+m.rows.length+'건으로 최소10건 미만입니다.':m.status==='one_label'?'목표 결과가 한 종류라 두 결과를 비교하는 질문을 만들지 않습니다.':'현재 3입력에서 표본·개선량 기준을 만족하는 분기를 찾지 못했습니다.'});return rows;}
       rows.push({항목:'첫 질문',내용:classroomNodeQuestion(m.tree.feature,m.tree.threshold)},{항목:'예 갈래',내용:classroomBranchMeaning(m.tree.feature,m.tree.threshold,true)+' → '+m.tree.yes.n+'건, 좋음 '+formatPercent(nodeGoodRate(m.tree.yes))},{항목:'아니오 갈래',내용:classroomBranchMeaning(m.tree.feature,m.tree.threshold,false)+' → '+m.tree.no.n+'건, 좋음 '+formatPercent(nodeGoodRate(m.tree.no))});
       let index=0;function walk(node,path){if(node.leaf){rows.push({항목:'결과 '+(++index)+' (왼쪽 끝점부터)',내용:path.join(' → ')+' : '+node.n+'건 중 좋음 '+node.good+'건 / 그 외 '+node.bad+'건. 좋음 관찰 비율 '+formatPercent(nodeGoodRate(node))+'. 색/다수결은 이 끝점의 더 많은 결과이며 모두 같은 결과라는 뜻은 아닙니다.'});return;}walk(node.yes,[...path,'예: '+CLASSROOM_TREE_LABELS[node.feature]+' = '+classroomBranchMeaning(node.feature,node.threshold,true)]);walk(node.no,[...path,'아니오: '+CLASSROOM_TREE_LABELS[node.feature]+' = '+classroomBranchMeaning(node.feature,node.threshold,false)]);}walk(m.tree,[]);
       rows.push({항목:'내 나무와 비교',내용:'첫 요인과 질문 기준이 같은가? 같은 기록을 예/아니오로 따라가면 어느 끝점인가? 그 끝점의 기록수·좋음 비율과 예외는 어떻게 다른가?'},{항목:'활동 목표',내용:'목표는 수면질 전체가 아니라 기상 후 컨디션 4~5점 여부입니다. 좋았던 조건을 탐색 → 수면 지식과 대조 → 안전한 실천 가설 선택 → 다시 기록해 확인합니다. 이 비율은 미래 성공확률이나 행동 추천이 아닙니다. 작은 표본의 높은 비율은 우연일 수 있고, 카페인 섭취를 권하는 근거가 아닙니다.'},{항목:'주의',내용:'카페인 양수 쪽의 좋음 비율이 높게 나오는 역방향 패턴도 그대로 표시합니다. 카페인의 효과나 인과관계가 아니며, 같은 자료로 만든 나무의 분류 비율은 검증된 예측성능이 아닙니다.'});return rows;
@@ -4159,8 +4169,8 @@ function researchCaffeineSheets(source, period) {
         case "취침6시간이내카페인여부": return "취침 전 6시간창에 0mg 초과 섭취 기록이 있나요? (실제 미섭취 판정 아님)";
         case "취침8시간이내카페인여부": return "취침 전 8시간창에 0mg 초과 섭취 기록이 있나요? (실제 미섭취 판정 아님)";
         case "취침12시간이내카페인여부": return "취침 전 12시간창에 0mg 초과 섭취 기록이 있나요? (실제 미섭취 판정 아님)";
-        case "취침전스마트폰_점수": return Math.ceil(thr) === 3 ? "취침 전 스마트폰을 많이 봤나? (3~4점)" : `취침 전 스마트폰 점수가 ${Math.ceil(thr) === 4 ? "4" : Math.ceil(thr) + "~4"}점인가?`;
-        case "신체활동_점수": return Math.ceil(thr) === 3 ? "신체활동을 많이 했나? (3~4점)" : `신체활동 점수가 ${Math.ceil(thr) === 4 ? "4" : Math.ceil(thr) + "~4"}점인가?`;
+        case "취침전스마트폰_점수": return treeTimeQuestion(feature,thr);
+        case "신체활동_점수": return treeTimeQuestion(feature,thr);
         default: return `${feature} > ${thr}?`;
       }
     }
@@ -4175,13 +4185,14 @@ function researchCaffeineSheets(source, period) {
 
     function branchLabel(node, isYesBranch) {
       if (!node || node.leaf) return "";
+      if (["취침전스마트폰_점수", "신체활동_점수"].includes(node.feature)) return treeTimeBranch(node.feature,node.threshold,isYesBranch);
       const question = nodeQuestion(node.feature, node.threshold);
       if (node.feature === "일일카페인총량_mg") {
         return isYesBranch
           ? `하루 카페인 ${Math.round(node.threshold)}mg 초과`
           : `하루 카페인 ${Math.round(node.threshold)}mg 이하`;
       }
-      if (["카페인섭취횟수", "카페인섭취시간대수", "취침전스마트폰_점수", "신체활동_점수"].includes(node.feature)) {
+      if (["카페인섭취횟수", "카페인섭취시간대수"].includes(node.feature)) {
         const cut = Math.ceil(node.threshold);
         const unit = node.feature === "카페인섭취횟수" ? "회"
           : node.feature === "카페인섭취시간대수" ? "개 시간대"
@@ -4274,7 +4285,7 @@ function researchCaffeineSheets(source, period) {
       }[ch]));
     }
 
-    function renderTreeSvg(root, question = nodeQuestion, classroom = false) {
+    function renderTreeSvg(root, question = nodeQuestion, classroom = false, roomy = classroom) {
       const nodes = [];
       const edges = [];
       let leafIndex = 0;
@@ -4288,17 +4299,17 @@ function researchCaffeineSheets(source, period) {
           layout(node.no, depth + 1, node, "아니오");
           node.x = (node.no.x + node.yes.x) / 2;
         }
-        node.y = depth * (classroom ? 185 : 140) + 30;
+        node.y = depth * (roomy ? 185 : 140) + 30;
         nodes.push(node);
         if (parent) edges.push({ from: parent, to: node, label: branch });
       }
       layout(root, 0);
       const maxX = Math.max(...nodes.map(node => node.x));
       const width = Math.max(760, maxX + 140);
-      const height = Math.max(...nodes.map(node => node.y)) + (classroom ? 155 : 130);
+      const height = Math.max(...nodes.map(node => node.y)) + (roomy ? 155 : 130);
       const nodeMarkup = nodes.map(node => {
         const boxW = node.leaf ? 190 : 280;
-        const boxH = classroom ? (node.leaf ? 136 : 130) : (node.leaf ? 112 : 92);
+        const boxH = roomy ? (node.leaf ? 136 : 130) : (node.leaf ? 112 : 92);
         const x = node.x - boxW / 2;
         const y = node.y;
         const isGood = node.className === "컨디션 좋음";
@@ -4333,7 +4344,7 @@ function researchCaffeineSheets(source, period) {
           </g>`;
       }).join("");
       const edgeMarkup = edges.map(edge => {
-        const fromY = edge.from.y + (classroom ? 130 : (edge.from.leaf ? 96 : 92));
+        const fromY = edge.from.y + (roomy ? 130 : (edge.from.leaf ? 96 : 92));
         const toY = edge.to.y;
         const midY = (fromY + toY) / 2;
         const labelX = (edge.from.x + edge.to.x) / 2;
