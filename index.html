@@ -360,13 +360,29 @@
     input[type="checkbox"] { width: 16px; height: 16px; min-height: 0; padding: 0; margin: 0; flex: 0 0 16px; }
     .checkbox-choice, .example-zip-choice { display: inline-flex; align-items: center; gap: 6px; min-height: 40px; }
     .lesson3-graphs{display:grid;gap:14px;margin-top:16px}.lesson3-graphs figure{margin:0;border:1px solid var(--line);border-radius:8px;background:#fff;padding:10px}.lesson3-graphs svg{width:100%;height:auto;display:block}.lesson3-graphs figcaption{padding-top:8px}.lesson3-answers{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-top:18px}.lesson3-answers section{border:1px solid var(--line);border-radius:8px;background:#fff;padding:14px}.lesson3-answers h3{font-size:15px;color:var(--brand);margin:0 0 8px}.lesson3-answers p,#lesson3ExamplePanel>p{font-size:14px;line-height:1.65}.lesson3-reference{background:#fffaeb;border:1px solid #fedf89;padding:12px;border-radius:8px}@media(max-width:700px){.lesson3-answers{grid-template-columns:1fr}}
+    .tree-viewer-dialog { box-sizing:border-box; width:min(96vw,1800px); max-width:96vw; height:92vh; height:min(92dvh,1000px); max-height:96vh; border:0; border-radius:12px; padding:0; color:#172033; box-shadow:0 12px 60px #0006; }
+    .tree-viewer-dialog[open] { display:flex; flex-direction:column; }
+    .tree-viewer-dialog::backdrop { background:rgba(15,23,42,.65); }
+    .tree-viewer-header { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:12px 16px; border-bottom:1px solid #d8dee9; }
+    .tree-viewer-header h2 { margin:0; font-size:19px; }
+    .tree-viewer-header p { margin:4px 0 0; font-size:13px; overflow-wrap:anywhere; }
+    .tree-viewer-toolbar { display:flex; flex-wrap:wrap; align-items:center; gap:7px; padding:8px 12px; }
+    .tree-viewer-toolbar button,.tree-viewer-header button { touch-action:manipulation; min-height:40px; margin:0; padding:8px 12px; }
+    .tree-viewer-hint { margin:0; padding:0 12px 8px; font-size:12px; color:#475467; }
+    .tree-viewer-viewport { flex:1; min-height:0; position:relative; overflow:hidden; background:#e8edf3; cursor:grab; touch-action:none; user-select:none; outline-offset:-3px; }
+    .tree-viewer-viewport.dragging { cursor:grabbing; }
+    .tree-viewer-content { position:absolute; left:0; top:0; transform-origin:0 0; will-change:transform; }
+    .tree-viewer-content svg { display:block; max-width:none; pointer-events:none; user-select:none; }
+    .tree-viewer-status { min-height:20px; margin:0; padding:6px 12px; font-size:13px; }
+    @media(max-width:600px) { .tree-viewer-dialog { width:98vw; max-width:98vw; height:96vh; height:96dvh; } .tree-viewer-header { padding:8px; } .tree-viewer-toolbar { gap:5px; padding:6px; } .tree-viewer-toolbar button { padding:7px 9px; } }
+
   </style>
 </head>
 <body>
   <header>
     <h1>교사용 카페인·수면 분석자료 생성기 v73</h1>
     <p>교사가 카페인·수면 원자료를 넣으면, 학생 활동에 사용할 반별·개인별 분석 데이터와 AI 분석용 CSV를 자동 생성합니다.</p>
-    <p id="publication-update">최근 반영: 2026-11-01T01:31:38.922Z (UTC). 4차시 학생 규칙표에 체중×2.5 기준량과 이상/미만 판정, 스마트폰·신체활동 점수와 시간, 컨디션1/0을 순서대로 표시합니다. 개인기록이 없으면 해당 반 학생 규칙표 CSV를 사용하세요. 가상 A/B/C 연습 기능은 제거했으며 TEST00 일일기록과 기존 AI·연구 계산은 유지합니다. 이전 화면이 보이면 파일 선택 전에 Ctrl+F5로 새로고침하세요.</p>
+    <p id="publication-update">최근 반영: 2026-11-01T02:06:06.026Z (UTC). 의사결정트리 크게 보기에서 확대·축소, 손으로 이동, 화면 맞춤을 사용할 수 있습니다. 질문에는 점수와 시간 범주를 함께 표시하고, 전체·조건별 기록 수와 컨디션별 건수·좋음 비율을 나누어 표시합니다. 이전 화면이 남으면 Ctrl+F5로 새로고침하세요.</p>
   </header>
 
   <main>
@@ -523,6 +539,18 @@
       </section>
     </div>
   </main>
+  <dialog id="treeViewerDialog" class="tree-viewer-dialog" aria-labelledby="treeViewerTitle" aria-describedby="treeViewerHint">
+    <div class="tree-viewer-header"><div><h2 id="treeViewerTitle">의사결정트리 크게 보기</h2><p id="treeViewerLabel"></p></div><button id="treeViewerClose" type="button" class="secondary" aria-label="확대 보기 닫기">닫기</button></div>
+    <div class="tree-viewer-toolbar" aria-label="나무 보기 조절">
+      <button id="treeViewerZoomOut" type="button" class="secondary" aria-label="축소">−</button><output id="treeViewerZoomLabel" aria-live="polite">100%</output><button id="treeViewerZoomIn" type="button" class="secondary" aria-label="확대">+</button>
+      <button id="treeViewerFit" type="button" class="secondary">화면 맞춤</button><button id="treeViewerActual" type="button" class="secondary">원래 크기</button>
+      <button id="treeViewerCopy" type="button" class="secondary">그림 복사 (PNG)</button><button id="treeViewerDownload" type="button" class="secondary">PNG 다운로드</button><button id="treeViewerPrint" type="button" class="secondary">그림 인쇄</button>
+    </div>
+    <p id="treeViewerHint" class="tree-viewer-hint">그림을 손 모양으로 끌어 이동하세요. 확대는 +/− 버튼 또는 Ctrl+휠, 키보드는 방향키·+/−·0(맞춤)·1(원래 크기), 닫기는 Esc입니다. 저장·복사·인쇄는 전체 나무입니다.</p>
+    <div id="treeViewerViewport" class="tree-viewer-viewport" tabindex="0" role="region" aria-label="확대 나무. 방향키로 이동하고 더하기 빼기로 확대 축소합니다."><div id="treeViewerContent" class="tree-viewer-content"></div></div>
+    <p id="treeViewerStatus" class="tree-viewer-status" role="status" aria-live="polite"></p>
+  </dialog>
+
 
   <script>
 /* Research alignment policy; reported bedtime is not an observed sleep-onset time. */
@@ -3883,7 +3911,7 @@ function researchCaffeineSheets(source, period) {
     function treeTimeScores(threshold,yes=true){return [1,2,3,4].filter(score=>yes?score>threshold:score<=threshold);}
     function treeTimeScoreRange(scores){return scores.length===1?scores[0]+'점':scores[0]+'~'+scores.at(-1)+'점';}
     function treeTimeQuestion(feature,threshold){
-      const phone=feature==='취침전스마트폰_점수',scores=treeTimeScores(threshold),range=treeTimeScoreRange(scores),time=scores[0]===2?(phone?'사용함':'활동함'):scores[0]===3?'30분 이상':'60분 이상';
+      const phone=feature==='취침전스마트폰_점수',scores=treeTimeScores(threshold),range=treeTimeScoreRange(scores),time=scores[0]===2?('30분 미만부터 60분 이상까지 '+(phone?'사용함':'활동함')):scores[0]===3?'30분 이상':'60분 이상';
       return (phone?'취침 전 스마트폰':'신체활동')+' 점수가 '+range+'인가요? ('+time+')';
     }
     function treeTimeBranch(feature,threshold,yes){const scores=treeTimeScores(threshold,yes),labels=['안 함','30분 미만','30~60분','60분 이상'];return (feature==='취침전스마트폰_점수'?'취침 전 스마트폰':'신체활동')+' '+treeTimeScoreRange(scores)+' ('+scores.map(s=>labels[s-1]).join(' / ')+')';}
@@ -3905,7 +3933,7 @@ function researchCaffeineSheets(source, period) {
       return {klass:String(klass),label:klass?klass+'반':'전체',features,columns,rows,sourceCount:source.length,excluded:source.length-rows.length,sourceStudents:students(source),validStudents:students(valid),good,bad,zero:rows.filter(r=>r.일일카페인총량_mg===0).length,intake:rows.filter(r=>r.일일카페인총량_mg>0).length,reasons,strictTree:strict,tree,status,selectedPeriod:(opt.analysisStart?dateKey(opt.analysisStart):'시작 제한 없음')+' ~ '+(opt.analysisEnd?dateKey(opt.analysisEnd):'종료 제한 없음'),actualPeriod:dates.length?dates[0]+' ~ '+dates.at(-1):'해당 주수면 없음'};
     }
     function classroomDiagnosticRows(m){return [{항목:'수업용 입력',내용:m.features.map(k=>CLASSROOM_TREE_LABELS[k]).join(' / ')},{항목:'표본 단위',내용:'학생 수가 아닌 날짜별 주수면 분석 기록. 같은 학생의 반복 기록 포함.'},{항목:'전처리 확정 선택 기간',내용:m.selectedPeriod},{항목:'해당 반 실제 주수면 분석일',내용:m.actualPeriod},{항목:'반 선택 후 주수면 기록',내용:m.sourceCount},{항목:'수업용 AI 가능 기록',내용:m.rows.length},{항목:'수업용 AI 제외 기록(고유 행)',내용:m.excluded},{항목:'주수면 기록 학생 수',내용:m.sourceStudents},{항목:'수업용 AI 사용 학생 수',내용:m.validStudents},{항목:'제외사유 읽기',내용:'아래 사유는 한 행에 중복될 수 있습니다. 사유별 건수를 합산하지 않습니다.'},...m.reasons.map(r=>({항목:r.label+' 결측·불명',내용:r.count})),{항목:'미사용 입력',내용:'4/6/8/12시간창·섭취횟수·시간대 지표는 수업용 입력에서 제외. 원기록과 연구용 정의는 보존.'},{항목:'해석 한계',내용:'관찰 기록의 패턴이며 카페인의 효과·인과관계·검증된 예측성능이 아닙니다. 반복 기록 건수는 독립된 학생 수가 아닙니다.'}];}
-    function classroomDiagnosticHtml(m){return `<div style="margin:10px 0;padding:12px;border:1px solid var(--line);background:#f8fafc"><b>${escapeHtml(m.label)} · 수업용 3입력</b><p>필터 후 주수면 ${m.sourceCount}건 → AI 가능 ${m.rows.length}건 / 제외 ${m.excluded}건<br>주수면 ${m.sourceStudents}명 중 AI 사용 ${m.validStudents}명 · 좋음 ${m.good}건 / 그 외 ${m.bad}건</p><p>선택 기간: ${escapeHtml(m.selectedPeriod)}<br>실제 주수면 분석일: ${escapeHtml(m.actualPeriod)}</p><p>입력: 취침 전24시간 기록기반 카페인 총량 · 취침 전 스마트폰 · 신체활동. 미기록을 0으로 채우지 않으며 명시적 0mg은 포함합니다.</p><p>${m.reasons.map(r=>escapeHtml(r.label)+' 결측·불명 '+r.count+'건').join(' / ')}<br><b>사유는 중복되므로 합산하지 않습니다.</b></p><p>표본은 학생 수가 아닌 날짜별 반복 기록입니다. 개인 학생 선택은 이 반별 AI 대상을 바꾸지 않습니다. 연구용 12입력과 구분합니다.</p>${studentRuleDiagnostic(m)}</div>`;}
+    function classroomDiagnosticHtml(m){return `<div style="margin:10px 0;padding:12px;border:1px solid var(--line);background:#f8fafc"><b>${escapeHtml(m.label)} · 카페인·스마트폰·신체활동으로 살펴보기</b><p>필터 후 주수면 ${m.sourceCount}건 → AI 가능 ${m.rows.length}건 / 제외 ${m.excluded}건<br>주수면 ${m.sourceStudents}명 중 AI 사용 ${m.validStudents}명 · 좋음 ${m.good}건 / 그 외 ${m.bad}건</p><p>선택 기간: ${escapeHtml(m.selectedPeriod)}<br>실제 주수면 분석일: ${escapeHtml(m.actualPeriod)}</p><p>입력: 취침 전24시간 기록기반 카페인 총량 · 취침 전 스마트폰 · 신체활동. 미기록을 0으로 채우지 않으며 명시적 0mg은 포함합니다.</p><p>${m.reasons.map(r=>escapeHtml(r.label)+' 결측·불명 '+r.count+'건').join(' / ')}<br><b>사유는 중복되므로 합산하지 않습니다.</b></p><p>표본은 학생 수가 아닌 날짜별 반복 기록입니다. 개인 학생 선택은 이 반별 AI 대상을 바꾸지 않습니다. 연구용 12입력과 구분합니다.</p>${studentRuleDiagnostic(m)}</div>`;}
     function updateClassroomTreeButtons(){const ready=!!state&&!state.identityWarnings?.length&&!lesson3DatesDirty();for(const id of ['treeDraw','downloadCsv','downloadStudentRuleCsv','downloadAiSummary'])if($(id))$(id).disabled=!ready;const panel=$('classroomTreeDiagnostics');if(panel)panel.innerHTML=ready?classroomDiagnosticHtml(classroomTreeModel()):state&&lesson3DatesDirty()?'<p>분석 기간이 바뀌었습니다. 전처리를 다시 실행해야 AI 입력·기간이 반영됩니다.</p>':'';}
     function classroomNodeQuestion(feature,threshold){
       if(feature==='일일카페인총량_mg')return '취침 전24h 기록 카페인이 '+threshold+'mg 초과인가요?';
@@ -4235,7 +4263,35 @@ function researchCaffeineSheets(source, period) {
 
     const treeImageState={real:null,practice:null};
     let treeImageSerial=0;
-    function clearTreeImage(scope){treeImageState[scope]=null;treeImageSerial+=1;}
+    const treeViewerState={snapshot:null,returnFocus:null,restoreFocus:true,bodyOverflow:'',scale:1,x:0,y:0,width:1,height:1,pointer:null,fitMode:true};
+    function treeViewerApply(){if(!treeViewerState.snapshot)return;const s=treeViewerState,v=$('treeViewerViewport'),content=$('treeViewerContent'),w=v.clientWidth,h=v.clientHeight;
+      s.x=s.width*s.scale<=w?(w-s.width*s.scale)/2:Math.min(0,Math.max(w-s.width*s.scale,s.x));s.y=s.height*s.scale<=h?(h-s.height*s.scale)/2:Math.min(0,Math.max(h-s.height*s.scale,s.y));
+      content.style.transform='translate('+s.x+'px,'+s.y+'px) scale('+s.scale+')';$('treeViewerZoomLabel').textContent=Math.round(s.scale*100)+'%';$('treeViewerZoomOut').disabled=s.scale<=.02;$('treeViewerZoomIn').disabled=s.scale>=4;}
+    function fitTreeViewer(){if(!treeViewerState.snapshot)return;const s=treeViewerState,v=$('treeViewerViewport');s.scale=Math.max(.02,Math.min(1,(v.clientWidth-24)/s.width,(v.clientHeight-24)/s.height));s.x=(v.clientWidth-s.width*s.scale)/2;s.y=(v.clientHeight-s.height*s.scale)/2;s.fitMode=true;treeViewerApply();}
+    function actualTreeViewer(){if(!treeViewerState.snapshot)return;const s=treeViewerState,v=$('treeViewerViewport');s.scale=1;s.x=(v.clientWidth-s.width)/2;s.y=(v.clientHeight-s.height)/2;s.fitMode=false;treeViewerApply();}
+    function zoomTreeViewer(factor,px=null,py=null){if(!treeViewerState.snapshot)return;const s=treeViewerState,v=$('treeViewerViewport'),x=px??v.clientWidth/2,y=py??v.clientHeight/2,next=Math.max(.02,Math.min(4,s.scale*factor));s.x=x-(x-s.x)*next/s.scale;s.y=y-(y-s.y)*next/s.scale;s.scale=next;s.fitMode=false;treeViewerApply();}
+    function treeViewerEndPointer(){const s=treeViewerState,v=$('treeViewerViewport'),id=s.pointer?.id;s.pointer=null;v.classList.remove('dragging');if(id!==undefined&&v.hasPointerCapture?.(id))v.releasePointerCapture(id);}
+    function finishTreeViewerClose(){const modal=$('treeViewerDialog');if(modal.open)return;const s=treeViewerState;if(!s.snapshot)return;const origin=s.returnFocus,restore=s.restoreFocus;treeViewerEndPointer();document.body.style.overflow=s.bodyOverflow;$('treeViewerContent').innerHTML='';s.snapshot=null;s.returnFocus=null;if(restore&&origin?.isConnected&&!origin.disabled)origin.focus({preventScroll:true});}
+    function closeTreeViewer(restore=true){const s=treeViewerState,modal=$('treeViewerDialog');if(!s.snapshot)return;s.restoreFocus=restore;if(modal.open)modal.close();finishTreeViewerClose();}
+    function openTreeViewer(scope){const snapshot=treeImageState[scope],modal=$('treeViewerDialog');if(!snapshot)return false;if(!modal||typeof modal.showModal!=='function'){treeImageStatus(scope,'이 브라우저는 확대 창을 지원하지 않습니다. PNG 다운로드를 이용하세요.');return false;}
+      if(treeViewerState.snapshot)closeTreeViewer(false);const content=$('treeViewerContent');content.innerHTML=snapshot.svg;const svg=content.querySelector('svg'),box=svg?.viewBox?.baseVal,width=box?.width||parseFloat(svg?.getAttribute('width')),height=box?.height||parseFloat(svg?.getAttribute('height'));
+      if(!svg||!Number.isFinite(width)||!Number.isFinite(height)||width<=0||height<=0){content.innerHTML='';treeImageStatus(scope,'그림 크기를 확인할 수 없습니다. 나무를 다시 생성하세요.');return false;}
+      const s=treeViewerState;s.snapshot=snapshot;s.returnFocus=document.activeElement;s.restoreFocus=true;s.bodyOverflow=document.body.style.overflow;s.width=width;s.height=height;s.pointer=null;svg.style.width=width+'px';svg.style.height=height+'px';svg.style.maxWidth='none';content.style.width=width+'px';content.style.height=height+'px';$('treeViewerLabel').textContent=snapshot.label||'현재 선택한 나무';$('treeViewerStatus').textContent='';document.body.style.overflow='hidden';modal.showModal();fitTreeViewer();$('treeViewerViewport').focus({preventScroll:true});return true;}
+    function treeViewerExport(action){const s=treeViewerState;if(!s.snapshot||treeImageState[s.snapshot.scope]!==s.snapshot){closeTreeViewer(false);return;}return action(s.snapshot.scope);}
+    function initTreeViewer(){const modal=$('treeViewerDialog');if(!modal||typeof modal.showModal!=='function')return;const v=$('treeViewerViewport');
+      $('treeViewerClose').addEventListener('click',()=>closeTreeViewer());$('treeViewerZoomOut').addEventListener('click',()=>zoomTreeViewer(1/1.25));$('treeViewerZoomIn').addEventListener('click',()=>zoomTreeViewer(1.25));$('treeViewerFit').addEventListener('click',fitTreeViewer);$('treeViewerActual').addEventListener('click',actualTreeViewer);
+      $('treeViewerCopy').addEventListener('click',()=>treeViewerExport(copyTreeImage));$('treeViewerDownload').addEventListener('click',()=>treeViewerExport(downloadTreeImage));$('treeViewerPrint').addEventListener('click',()=>treeViewerExport(printTreeImage));
+      modal.addEventListener('cancel',e=>{e.preventDefault();closeTreeViewer();});modal.addEventListener('close',finishTreeViewerClose);
+      modal.addEventListener('keydown',e=>{if(e.key!=='Tab'||!modal.open)return;const items=[...modal.querySelectorAll('button:not([disabled]),[tabindex="0"]')].filter(el=>el.getClientRects().length);if(!items.length)return;const first=items[0],last=items[items.length-1],active=document.activeElement;if(!items.includes(active)||!e.shiftKey&&active===last||e.shiftKey&&active===first){e.preventDefault();(e.shiftKey?last:first).focus({preventScroll:true});}});
+      v.addEventListener('pointerdown',e=>{if(!treeViewerState.snapshot||treeViewerState.pointer||e.button!==0)return;const s=treeViewerState;s.pointer={id:e.pointerId,startX:e.clientX,startY:e.clientY,x:s.x,y:s.y};s.fitMode=false;v.focus({preventScroll:true});v.classList.add('dragging');v.setPointerCapture(e.pointerId);e.preventDefault();});
+      v.addEventListener('pointermove',e=>{const s=treeViewerState,p=s.pointer;if(!p||p.id!==e.pointerId)return;s.x=p.x+e.clientX-p.startX;s.y=p.y+e.clientY-p.startY;treeViewerApply();e.preventDefault();});
+      for(const name of ['pointerup','pointercancel','lostpointercapture'])v.addEventListener(name,e=>{if(treeViewerState.pointer?.id===e.pointerId)treeViewerEndPointer();});
+      v.addEventListener('wheel',e=>{if(!e.ctrlKey&&!e.metaKey)return;e.preventDefault();const r=v.getBoundingClientRect();zoomTreeViewer(Math.exp(-e.deltaY*.002),e.clientX-r.left,e.clientY-r.top);},{passive:false});
+      v.addEventListener('keydown',e=>{if(e.ctrlKey||e.metaKey||e.altKey)return;const s=treeViewerState;if(!s.snapshot)return;let used=true;switch(e.key){case '+':case '=':zoomTreeViewer(1.25);break;case '-':zoomTreeViewer(1/1.25);break;case '0':fitTreeViewer();break;case '1':actualTreeViewer();break;case 'ArrowLeft':s.x+=80;treeViewerApply();break;case 'ArrowRight':s.x-=80;treeViewerApply();break;case 'ArrowUp':s.y+=80;treeViewerApply();break;case 'ArrowDown':s.y-=80;treeViewerApply();break;default:used=false;}if(used)e.preventDefault();});
+      if(typeof ResizeObserver!=='undefined')new ResizeObserver(()=>{if(treeViewerState.snapshot){if(treeViewerState.fitMode)fitTreeViewer();else treeViewerApply();}}).observe(v);
+    }
+
+    function clearTreeImage(scope){if(treeViewerState.snapshot?.scope===scope)closeTreeViewer(false);treeImageState[scope]=null;treeImageSerial+=1;}
     function treeImageCondition(node,yes){
       if(['취침전스마트폰_점수','신체활동_점수'].includes(node.feature))return treeTimeBranch(node.feature,node.threshold,yes);
       if(node.feature==='일일카페인총량_mg')return '취침 전24h 기록 총량 '+node.threshold+'mg '+(yes?'초과':'이하');
@@ -4246,20 +4302,20 @@ function researchCaffeineSheets(source, period) {
     function renderTreeSvg(root,question=nodeQuestion,classroom=false,roomy=classroom,context={}){
       if(!root)return '';const records=[],edges=[],levelH=[],gap=[],positions=new Map();let leaf=0;
       function collect(node,depth){let x;if(node.leaf)x=leaf++*480;else{x=(collect(node.yes,depth+1)+collect(node.no,depth+1))/2;edges.push({from:node,to:node.yes,yes:true},{from:node,to:node.no,yes:false});}const n=Number(node.n)||0,g=Number(node.good)||0,b=Number(node.bad)||0,tie=g===b&&n>0,small=n<10||(g>0&&g<TREE_MIN_CLASS_N)||(b>0&&b<TREE_MIN_CLASS_N),width=node.leaf?380:420;
-        const title=node.leaf?(n===0?'기록 없음 · 분기 없음':tie?'끝점 · 동률':`끝점 · ${node.className||'기록 요약'}`):question(node.feature,node.threshold);
-        const blocks=[{text:title,size:18,bold:true},{text:`좋음 ${g}/${n}건 · 그 외 ${b}건`,size:16,bold:true},{text:n?`좋음 관찰 비율 ${formatPercent(g/n)}`:'관찰 비율 계산 불가 (분모 0)',size:16,bold:true}];
-        if(node.leaf){blocks.push({text:tie?`좋음과 그 외가 같은 건수입니다. 어느 쪽도 과반이 아닙니다. 기존 판정: ${node.className||'그 외'}`:`이 조건의 모든 ${n}건 중 기상 후 컨디션 4~5점인 기록이 ${g}건입니다.`,size:14});if(node.stopReason)blocks.push({text:node.stopReason,size:12,color:'#667085'});}else{blocks.push({text:`이곳의 좋음 ${g}건과 그 외 ${b}건, 모든 기록을 아래 행동 조건으로 다시 나눕니다.`,size:14});blocks.push({text:`분리 개선량 ${Number(node.gain||0).toFixed(2)}`,size:12,color:'#667085'});}if(small)blocks.push({text:'작은 표본·결과 편중 주의',size:12,color:'#9a3412'});
+        const title=node.leaf?(n===0?'기록 없음 · 분기 없음':''):question(node.feature,node.threshold);
+        const blocks=[...(title?[{text:title,size:18,bold:true}]:[]),{text:(depth===0?'분석한 전체 기록 ':'이 조건에 해당하는 기록 ')+n+'건',size:16,bold:true},{text:'컨디션 4~5점(좋음): '+g+'건',size:16,bold:true},{text:'컨디션 1~3점(그 외): '+b+'건',size:16,bold:true},{text:n?'이 기록 중 좋았던 날의 비율: '+formatPercent(g/n):'비율 계산 불가 (기록 없음)',size:16,bold:true}];
+        if(node.leaf){if(tie)blocks.push({text:'좋음과 그 외가 같은 건수입니다. 어느 쪽도 과반이 아닙니다. 기존 판정: '+(node.className||'그 외'),size:14});if(node.stopReason)blocks.push({text:node.stopReason,size:12,color:'#667085'});}else{blocks.push({text:'이곳의 모든 기록을 아래 행동 조건으로 다시 나눕니다.',size:14});blocks.push({text:'분리 개선량 '+Number(node.gain||0).toFixed(2),size:12,color:'#667085'});}if(small)blocks.push({text:'작은 표본·결과 편중 주의',size:12,color:'#9a3412'});
         let height=30;for(const block of blocks){block.lines=treeImageWrap(block.text,width-36,block.size);height+=block.lines.length*Math.ceil(block.size*1.45)+8;}const p={node,depth,x,width,height,blocks,tie};records.push(p);positions.set(node,p);levelH[depth]=Math.max(levelH[depth]||0,height);return x;}
       collect(root,0);const width=Math.max(1000,leaf*480+80),offset=(width-(leaf-1)*480)/2;
       for(const e of edges){e.lines=treeImageWrap((e.yes?'예 · ':'아니오 · ')+treeImageCondition(e.from,e.yes),410,14);gap[positions.get(e.to).depth]=Math.max(gap[positions.get(e.to).depth]||150,e.lines.length*21+75);}
       const header=[{text:context.title||'AI 나무 · 날짜별 기록',size:22,bold:true},{text:(context.subtitle||'')+(context.subtitle?' · ':'')+(root.leaf?'분기 없음':root.visualFallback?'관찰용 · 엄격 기준 통과 아님':'엄격 기준의 임시 규칙'),size:14},{text:'예/아니오 = 질문의 행동 조건에 해당/해당하지 않음. 컨디션 좋음/나쁨 판정이 아닙니다.',size:15,bold:true},{text:'다음 질문은 해당 가지의 좋음·그 외 모든 기록을 다시 분류합니다.',size:15}];let top=36;let head='';for(const block of header){const lines=treeImageWrap(block.text,width-80,block.size);head+=treeSvgText(lines,40,top,block.size,'#172033',block.bold?700:400);top+=lines.length*Math.ceil(block.size*1.45)+12;}top+=16;const ys=[top];for(let d=1;d<levelH.length;d++)ys[d]=ys[d-1]+levelH[d-1]+gap[d];for(const p of records){p.x+=offset;p.y=ys[p.depth];}
       let graph='';for(const e of edges){const a=positions.get(e.from),b=positions.get(e.to),bottom=a.y+a.height,joint=bottom+18,labelY=joint+16,labelH=e.lines.length*21+12;graph+=`<path d="M${a.x} ${bottom} V${joint} H${b.x} V${b.y}" fill="none" stroke="#b8c5d8" stroke-width="2"/><rect x="${b.x-223}" y="${labelY}" width="446" height="${labelH}" rx="6" fill="#ffffff" stroke="#d8dee9"/>`+treeSvgText(e.lines,b.x,labelY+20,14,'#344054',600,'middle');}
       for(const p of records){const good=p.node.className==='컨디션 좋음',fill=!p.node.leaf?'#eef9fb':p.tie?'#f1f5f9':good?'#ecfdf3':'#fffaeb',stroke=!p.node.leaf?'#176b87':p.tie?'#64748b':good?'#027a48':'#b54708';graph+=`<g data-tree-node="true"><rect x="${p.x-p.width/2}" y="${p.y}" width="${p.width}" height="${p.height}" rx="10" fill="${fill}" stroke="${stroke}" stroke-width="2"/>`;let y=p.y+27;for(const block of p.blocks){graph+=treeSvgText(block.lines,p.x,y,block.size,block.color||'#172033',block.bold?700:400,'middle');y+=block.lines.length*Math.ceil(block.size*1.45)+8;}graph+='</g>';}
-      let footerY=Math.max(...records.map(p=>p.y+p.height))+40;const footer=[treeTimeLegend(),'표본은 학생 수가 아닌 날짜별 반복 기록입니다. 좋음은 기상 후 컨디션 4~5점이며 수면질 전체가 아닙니다.','관찰 비율은 인과 효과·미래 성공확률·최적 행동 추천이 아닙니다.'];let foot='';for(const s of footer){const lines=treeImageWrap(s,width-80,14);foot+=treeSvgText(lines,40,footerY,14,'#475467');footerY+=lines.length*21+10;}const height=footerY+20;
+      let footerY=Math.max(...records.map(p=>p.y+p.height))+40;const footer=[treeTimeLegend(),'건수는 학생 수가 아닌 날짜별 반복 기록입니다. 좋음=기상 후 컨디션 4~5점, 그 외=1~3점이며 나쁨과 같은 뜻은 아닙니다.','좋음 비율 = 좋음 기록 수 ÷ 전체 기록 수 × 100. 관찰 비율이며 인과 효과·미래 확률·최적 행동 추천이 아닙니다.'];let foot='';for(const s of footer){const lines=treeImageWrap(s,width-80,14);foot+=treeSvgText(lines,40,footerY,14,'#475467');footerY+=lines.length*21+10;}const height=footerY+20;
       return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" width="${width}" height="${height}" style="display:block;width:100%;height:auto" role="img" aria-label="행동 조건과 관찰 비율을 함께 읽는 AI 나무" font-family="Malgun Gothic, Noto Sans KR, Segoe UI, sans-serif"><rect width="${width}" height="${height}" fill="#ffffff"/>${head}${graph}${foot}</svg>`;
     }
-    function treeFigureHtml(scope,svg,label){const snapshot={scope,svg,label,serial:++treeImageSerial};treeImageState[scope]=snapshot;return `<div data-tree-figure="${scope}" style="overflow:auto">${svg}</div><div data-tree-controls style="display:flex;gap:8px;flex-wrap:wrap;margin:12px 0"><button id="${scope}TreeCopy" type="button" class="secondary" onclick="copyTreeImage('${scope}')">그림 복사 (PNG)</button><button id="${scope}TreePng" type="button" class="secondary" onclick="downloadTreeImage('${scope}')">PNG 다운로드</button><button type="button" class="secondary" onclick="printTreeImage('${scope}')">그림 인쇄</button><span id="${scope}TreeImageStatus" role="status" aria-live="polite"></span></div>`;}
-    function treeImageStatus(scope,text){const el=$(scope+'TreeImageStatus');if(el)el.textContent=text;}
+    function treeFigureHtml(scope,svg,label){const snapshot={scope,svg,label,serial:++treeImageSerial};treeImageState[scope]=snapshot;return `<div data-tree-figure="${scope}" style="overflow:auto">${svg}</div><div data-tree-controls style="display:flex;gap:8px;flex-wrap:wrap;margin:12px 0"><button id="${scope}TreeExpand" type="button" class="secondary" onclick="openTreeViewer('${scope}')">크게 보기</button><button id="${scope}TreeCopy" type="button" class="secondary" onclick="copyTreeImage('${scope}')">그림 복사 (PNG)</button><button id="${scope}TreePng" type="button" class="secondary" onclick="downloadTreeImage('${scope}')">PNG 다운로드</button><button type="button" class="secondary" onclick="printTreeImage('${scope}')">그림 인쇄</button><span id="${scope}TreeImageStatus" role="status" aria-live="polite"></span></div>`;}
+    function treeImageStatus(scope,text){const el=$(scope+'TreeImageStatus');if(el)el.textContent=text;if(treeViewerState.snapshot?.scope===scope)$('treeViewerStatus').textContent=text;}
     async function treeImagePng(snapshot){if(treeImageState[snapshot.scope]!==snapshot)throw new Error('선택이 바뀌었습니다. 그림을 다시 생성하세요.');const url=URL.createObjectURL(new Blob([snapshot.svg],{type:'image/svg+xml;charset=utf-8'}));try{const img=new Image();await new Promise((resolve,reject)=>{img.onload=resolve;img.onerror=()=>reject(new Error('그림 변환 실패'));img.src=url;});if(treeImageState[snapshot.scope]!==snapshot)throw new Error('선택이 바뀌었습니다.');const canvas=document.createElement('canvas'),scale=Math.min(2,4096/img.naturalWidth);canvas.width=Math.ceil(img.naturalWidth*scale);canvas.height=Math.ceil(img.naturalHeight*scale);const ctx=canvas.getContext('2d');if(!ctx)throw new Error('PNG 변환을 지원하지 않습니다.');ctx.fillStyle='#fff';ctx.fillRect(0,0,canvas.width,canvas.height);ctx.drawImage(img,0,0,canvas.width,canvas.height);const blob=await new Promise((resolve,reject)=>canvas.toBlob(b=>b?resolve(b):reject(new Error('PNG 생성 실패')),'image/png'));if(treeImageState[snapshot.scope]!==snapshot)throw new Error('선택이 바뀌었습니다.');return blob;}finally{URL.revokeObjectURL(url);}}
     async function copyTreeImage(scope){const snapshot=treeImageState[scope];if(!snapshot)return;treeImageStatus(scope,'PNG를 준비하고 있습니다…');const button=$(scope+'TreeCopy');if(button)button.disabled=true;try{if(typeof navigator==='undefined'||!navigator.clipboard?.write||typeof ClipboardItem==='undefined')throw new Error('이 브라우저는 그림 복사를 지원하지 않습니다.');const png=treeImagePng(snapshot);png.catch(()=>{});await navigator.clipboard.write([new ClipboardItem({'image/png':png})]);if(treeImageState[scope]===snapshot)treeImageStatus(scope,'그림을 복사했습니다. Google Docs/Slides에 붙여넣으세요.');}catch(error){if(treeImageState[scope]===snapshot)treeImageStatus(scope,'복사하지 못했습니다. PNG 다운로드를 이용하세요. '+(error.name==='NotAllowedError'?'클립보드 쓰기가 허용되지 않았습니다.':error.message));}finally{if(treeImageState[scope]===snapshot&&button)button.disabled=false;}}
     async function downloadTreeImage(scope){const snapshot=treeImageState[scope];if(!snapshot)return;treeImageStatus(scope,'PNG를 준비하고 있습니다…');try{const blob=await treeImagePng(snapshot);if(treeImageState[scope]!==snapshot)return;saveLesson3Blob(blob,'4차시_'+safeFileName(snapshot.label)+'_AI나무_해석포함.png');treeImageStatus(scope,'PNG 다운로드를 시작했습니다.');}catch(error){if(treeImageState[scope]===snapshot)treeImageStatus(scope,error.message);}}
@@ -4294,7 +4350,7 @@ function researchCaffeineSheets(source, period) {
       return `
         <div style="border-top:1px solid var(--line); margin-top:12px; padding-top:10px; font-size:12px; line-height:1.6; color:var(--muted);">
           <div><b style="color:var(--ink);">신뢰도 안내</b> 전체 표본 ${rows.length}건 · 컨디션 좋음 ${good}건 / 그 외 ${bad}건 · ${cautious ? '<b style="color:var(--warn);">주의</b>' : '<b style="color:var(--good);">비교적 안정</b>'}</div>
-          <div style="margin-top:4px;">${escapeHtml(classroom ? "수업용 3입력" : treeModeLabel())}: 0mg 기록 ${modeStats.zero}건 · 1mg 이상 섭취 기록 ${modeStats.intake}건</div>
+          <div style="margin-top:4px;">${escapeHtml(classroom ? "카페인·스마트폰·신체활동으로 살펴보기" : treeModeLabel())}: 0mg 기록 ${modeStats.zero}건 · 1mg 이상 섭취 기록 ${modeStats.intake}건</div>
           <div style="margin-top:4px;">${escapeHtml(classroom ? "취침 전24시간 기록기반 카페인 총량·스마트폰·신체활동 3입력과 목표값의 결측 행만 제외합니다. 사용하지 않는 시간창·시간대 지표의 빈칸은 제외 조건이 아닙니다." : treeModeDescription())}</div>
           <div style="margin-top:6px; color:${cautious ? '#7a4f12' : 'var(--muted)'};">${escapeHtml(splitCautionReason(tree, rows))}</div>
           ${treeContainsStoppedSecondQuestion(tree) ? `<div style="margin-top:6px; color:#7a4f12;">이번 데이터에서는 첫 질문 하나만으로도 컨디션 좋음/그 외가 크게 갈렸거나, 두 번째 질문을 만들 만큼 안정적인 규칙이 발견되지 않았어요. 질문이 1개인 것은 오류가 아닙니다. 0mg은 미섭취 기록으로 포함하고, 빈칸은 기록 누락 가능성이 있어 제외한 상태에서 해석하세요.</div>` : ""}
@@ -4307,7 +4363,7 @@ function researchCaffeineSheets(source, period) {
       if (!classroomTreeReady()) return;
       const model=classroomTreeModel();updateClassroomTreeButtons();
       clearTreeImage("real");
-      const context={title:treeTargetLabel()+" · 수업용 3입력",subtitle:model.actualPeriod+" · 날짜별 기록"};
+      const context={title:treeTargetLabel()+" · 카페인·스마트폰·신체활동으로 살펴보기",subtitle:model.actualPeriod+" · 날짜별 기록"};
       const figure=tree=>treeFigureHtml("real",renderTreeSvg(tree,classroomNodeQuestion,true,true,context),treeTargetLabel());
       const panel = $("treePanel");
       const rows = model.rows;
@@ -4337,9 +4393,9 @@ function researchCaffeineSheets(source, period) {
       panel.innerHTML = alarmHtml + `
         <div style="border:1px solid var(--line); border-radius:8px; padding:14px; background:#fff;">
           <div style="font-size:12px; color:var(--muted); margin-bottom:8px;">화면을 캡처하거나 그대로 투사해 학생이 옮겨 적게 하세요.</div>
-          <div style="font-size:12px; color:var(--muted); margin-bottom:8px;">※ 질문을 예/아니오로 따라가며 끝점의 좋음 건수/전체 기록수와 관찰 비율을 읽으세요. 다수결이 그 외여도 좋음 비율의 차이는 비교할 수 있습니다. 개선량은 선생님 설명용입니다.</div>
+          <div style="font-size:12px; color:var(--muted); margin-bottom:8px;">※ 질문을 예/아니오로 따라가며 각 조건의 전체 기록, 컨디션별 건수와 좋음 비율을 읽으세요. 다수결이 그 외여도 좋음 비율의 차이는 비교할 수 있습니다. 개선량은 선생님 설명용입니다.</div>
           ${fallbackNotice}
-          <div style="font-weight:800; color:var(--ink); margin-bottom:6px;">${displayTree.visualFallback ? "AI가 표시한 관찰용 치우침 나무" : "AI가 찾은 임시 규칙 나무"} — ${escapeHtml(treeTargetLabel())} · ${escapeHtml("수업용 3입력")} · 표본 ${rows.length}건</div>
+          <div style="font-weight:800; color:var(--ink); margin-bottom:6px;">${displayTree.visualFallback ? "AI가 표시한 관찰용 치우침 나무" : "AI가 찾은 임시 규칙 나무"} — ${escapeHtml(treeTargetLabel())} · ${escapeHtml("카페인·스마트폰·신체활동으로 살펴보기")} · 표본 ${rows.length}건</div>
           <div style="font-size:12px; color:var(--muted); margin-bottom:10px;">${escapeHtml("취침 전24시간 기록기반 카페인 총량 · 스마트폰 · 신체활동만 사용. 빈칸 제외/명시적0mg 포함. 표본은 날짜별 반복 기록이며 학생 수가 아닙니다.")} 0mg 기록 ${modeStats.zero}건, 1mg 이상 섭취 기록 ${modeStats.intake}건.</div>
           ${figure(displayTree)}
           ${classroomInterpretationHtml(model)}
@@ -4772,6 +4828,7 @@ function researchCaffeineSheets(source, period) {
     });
 
     $("downloadTeacher").addEventListener("click", () => downloadWorkbook(true));
+    initTreeViewer();
     $("downloadCsv").addEventListener("click", downloadCsv);
     $("downloadStudentRuleCsv").addEventListener("click",downloadStudentRuleCsv);
     $("downloadAiSummary").addEventListener("click", downloadAiSummary);
