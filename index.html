@@ -292,6 +292,14 @@
       background: #fafbfc;
     }
 
+    #dlSection > .dl-row[data-lesson="2"], #dlSection > .dl-row[data-lesson="4"] { background: #f3f4f6; }
+    #dlSection > .dl-row[data-lesson="3"], #dlSection > .dl-row[data-lesson="6"] { background: #ffffff; }
+
+    #dlSection .dl-controls { min-width: 0; }
+    #dlSection .dl-controls > *, #dlSection .dl-controls select { max-width: 100%; }
+
+    @media (max-width: 640px) { #dlSection .dl-controls { flex-basis: 100%; width: 100%; } }
+
     .dl-label {
       font-size: 13px;
       font-weight: 700;
@@ -385,7 +393,7 @@
   <header>
     <h1>교사용 카페인·수면 분석자료 생성기 v73</h1>
     <p>교사가 카페인·수면 원자료를 넣으면, 학생 활동에 사용할 반별·개인별 분석 데이터와 AI 분석용 CSV를 자동 생성합니다.</p>
-    <p id="publication-update">최근 반영: 2026-11-01T04:39:21.051Z (UTC). 마지막 컨디션은 “기상 후 컨디션이 좋았나요? (4~5점)”와 예·아니오 결과로 표시합니다. AI 분석 결과 한눈에 보기에서 실제 선택 질문과 경로별 결과를 먼저 확인하세요. 카페인 첫 기준과 모델 계산은 유지했습니다. 이전 화면이면 Ctrl+F5로 새로고침하세요.</p>
+    <p id="publication-update">최근 반영: <time datetime="2026-11-01T05:26:48.242Z">2026-11-01 14:26 한국시간</time><br>4차시 규칙표에 취침시각·수면시간 필터를 추가했습니다. 첫 카페인 질문은 이상/미만, 마지막은 기상 후 컨디션으로 확인합니다.<br>2·4차시는 회색, 3·6차시는 흰색입니다. 다시 전처리한 뒤 새 Excel을 내려받으세요.</p>
   </header>
 
   <main>
@@ -463,7 +471,7 @@
               <button id="downloadReview" class="secondary" disabled>📥 교사용 차시·반별 검수 자료</button>
             </div>
           </div>
-          <div class="dl-row">
+          <div class="dl-row" data-lesson="2">
             <span class="dl-label">[2차시] 내 데이터 점검</span>
             <div class="dl-controls">
               <input id="dataCheckStart" type="date" title="점검 시작일" />
@@ -476,7 +484,7 @@
               <label class="example-zip-choice"><input id="includeExampleCheck" type="checkbox">개인별 ZIP에 수업용 예시 포함</label>
             </div>
           </div>
-          <div class="dl-row">
+          <div class="dl-row" data-lesson="3">
             <span class="dl-label">[3차시] 반별 시각화·반별 비교</span>
             <div class="dl-controls">
               <select id="classSelect"><option value="">반 선택</option></select>
@@ -487,7 +495,7 @@
             </div>
           </div>
           <div id="lesson3ExamplePanel" style="display:none;padding:18px;"></div>
-          <div class="dl-row">
+          <div class="dl-row" data-lesson="4">
             <span class="dl-label">[4차시] 개인 데이터 + 반별 분석</span>
             <div class="dl-controls">
               <select id="classForStudent"><option value="">반 선택</option></select>
@@ -498,7 +506,7 @@
               <span style="font-size:11px; color:#667085;">개인별 분석 자료는 교사용으로 생성됩니다. 학생에게는 전체 ZIP 파일을 공유하지 말고, 해당 학생의 파일만 개별 전달하세요.</span>
             </div>
           </div>
-          <div class="dl-row">
+          <div class="dl-row" data-lesson="4">
             <span class="dl-label">[4차시] 의사결정트리 분석</span>
             <div class="dl-controls">
               <label>AI 방식 <select id="treeLearningMode"><option value="ordered">공통 카페인 기준 후 AI 탐색</option><option value="free">기존 자유학습 AI (반·전체)</option></select></label><span id="orderedTreeControls"><label>대상 <select id="orderedTreeScope"><option value="class">반·전체 자료</option><option value="personal">개인 자료</option></select></label><select id="orderedTreeStudent" aria-label="제한순서 AI 개인 선택"><option value="">개인 선택</option></select></span>
@@ -512,7 +520,7 @@
             <div id="classroomTreeDiagnostics" style="flex:0 0 100%;width:100%"></div>
             <div id="treePanel" style="display:none; margin-top:12px; flex:0 0 100%; width:100%;"></div>
           </div>
-          <div class="dl-row">
+          <div class="dl-row" data-lesson="6">
             <span class="dl-label">[6차시] 초기 관찰구간 ↔ 종료 관찰구간</span>
             <div class="dl-controls">
               <span style="font-size:12px">초기 관찰구간</span><input id="beforeExperimentStart" type="date" title="처음 기록 시작일" />
@@ -998,6 +1006,8 @@ var SleepRecordPolicy = (function () {
       });
     }
 
+    function formatPublicationKst(value){const date=new Date(value);if(!Number.isFinite(date.getTime()))return '시간 확인 필요';const parts=Object.fromEntries(new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Seoul',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).formatToParts(date).map(p=>[p.type,p.value]));return parts.year+'-'+parts.month+'-'+parts.day+' '+parts.hour+':'+parts.minute+' 한국시간';}
+
     function hourOf(value) {
       const text = timeText(value);
       const match = text.match(/^(\d{1,2}):(\d{2})/);
@@ -1220,19 +1230,44 @@ var SleepRecordPolicy = (function () {
       const value=valid.length?valid.reduce((sum,r)=>sum+r.limit/valid.length,0):null;
       return {value,validCount:valid.length,targetCount,excludedCount:targetCount-valid.length,scopeLabel:anon?'개인':klass?'2학년 '+studentRuleClassCode(klass)+'반':'2학년 전체',kind:anon?'personal':'class',period:studentRulePeriod(),conflictCount:selected.filter(r=>r.conflict||r.weightConflict).length,scopeUnconfirmedCount:anon?0:all.filter(r=>r.members.every(m=>!m.grade)&&(!klass||r.members.some(m=>m.klass===studentRuleClassCode(klass)))).length};
     }
+    const STUDENT_RULE_SLEEP_COLUMNS=Object.freeze(['취침시각_HHMM','수면시간_h','취침시각_분석일0시기준_h','수면연결상태']);
+    function studentRuleSleepBlank(status){return {취침시각_HHMM:'',수면시간_h:'',취침시각_분석일0시기준_h:'',수면연결상태:status};}
+    function studentRuleSleepIdentity(r){return idText(r._학번||r.익명ID);}
+    function studentRuleSleepDay(r){return studentRuleSleepIdentity(r)+'|'+String(r.분석일||'');}
+    function studentRuleSleepKey(r){return [studentRuleSleepDay(r),r.실제취침일,r.취침시간,r.실제기상일,r.기상시간].map(v=>String(v??'')).join('|');}
+    function studentRuleSleepIndex(source){const days=new Map(),records=new Map();for(const r of source){const day=studentRuleSleepDay(r);if(!days.has(day))days.set(day,[]);days.get(day).push(r);const id=idText(r.기록ID);if(id){const key=studentRuleSleepIdentity(r)+'|'+id;if(!records.has(key))records.set(key,new Set());records.get(key).add(studentRuleSleepKey(r));}}return {days,records};}
+    function studentRuleSleepDate(value){const m=String(value??'').match(/^(\d{4})-(\d{2})-(\d{2})$/);if(!m)return null;const [y,mo,d]=m.slice(1).map(Number),n=Date.UTC(y,mo-1,d),v=new Date(n);return v.getUTCFullYear()===y&&v.getUTCMonth()===mo-1&&v.getUTCDate()===d?n:null;}
+    function studentRuleSleepFields(row,source){
+      const index=Array.isArray(source)?studentRuleSleepIndex(source):source,identity=studentRuleSleepIdentity(row),day=studentRuleSleepDate(row.분석일);if(!identity||day===null)return studentRuleSleepBlank('학생·분석일 확인 필요');
+      if(row.주수면분석상태!=='사용')return studentRuleSleepBlank('주수면 확인 필요');
+      if(!['','0'].includes(String(row.ID버전충돌??'').trim()))return studentRuleSleepBlank('수면기록 충돌 확인 필요');
+      const peers=index?.days.get(studentRuleSleepDay(row))||[];if(peers.length!==1||studentRuleSleepKey(peers[0])!==studentRuleSleepKey(row))return studentRuleSleepBlank('중복·복수 수면구간 확인 필요');
+      const record=idText(row.기록ID);if(record&&(index.records.get(identity+'|'+record)?.size||0)>1)return studentRuleSleepBlank('수면기록 충돌 확인 필요');
+      const bedDay=studentRuleSleepDate(row.실제취침일),wakeDay=studentRuleSleepDate(row.실제기상일),bed=String(row.취침시간??''),wake=String(row.기상시간??''),clock=/^(?:[01]\d|2[0-3]):[0-5]\d$/;
+      if(bedDay===null||wakeDay===null||!clock.test(bed)||!clock.test(wake)||wakeDay-86400000!==day)return studentRuleSleepBlank('실제 수면구간 확인 필요');
+      const hours=s=>Number(s.slice(0,2))+Number(s.slice(3,5))/60,bedHour=hours(bed),wakeHour=hours(wake);if(wakeDay+wakeHour*3600000<=bedDay+bedHour*3600000)return studentRuleSleepBlank('실제 수면구간 확인 필요');
+      const duration=SleepRecordPolicy.amount(row.수면시간_h),validDuration=duration!==null&&duration>0;return {취침시각_HHMM:bed,수면시간_h:validDuration?duration:'',취침시각_분석일0시기준_h:(bedDay-day)/3600000+bedHour,수면연결상태:validDuration?'연결됨':'수면시간 확인 필요'};
+    }
+    function studentRuleSleepGuide(m){return [
+      '추가 탐구: 학생규칙_활동표 '+(m.kind==='personal'?'J취침시각/K수면시간/L취침시각 비교값/M연결상태':'I취침시각/J수면시간/K취침시각 비교값/L연결상태')+'를 필터합니다. 학생 규칙표 CSV는 개인 O:R, 반·전체 N:Q에 같은 항목이 있습니다.',
+      '수면시간_h는 기존 분석에 쓰인 신고 취침~기상 날짜시각 간격(시간)입니다. 예: 7시간 이상은 ≥7, 미만은 <7로 나눌 수 있습니다. 미기록·연결 보류는 별도 확인하고 0시간으로 세지 않습니다.',
+      '취침시각_HHMM은 시계 표시입니다. 자정 전후 비교는 취침시각_분석일0시기준_h를 사용합니다. 분석일은 기상일 전날이며, 분석일0시부터 실제 취침까지의 시간입니다. 같은 분석일의 23:30=23.5, 다음 날00:30=24.5입니다. 예: 자정 이후는 ≥24, 이전은 <24. 23.5는23시30분이며23시50분이 아닙니다.',
+      '연결상태가 확인 필요인 행은 학생·분석일·실제 수면구간의 중복/충돌을 확인합니다. 기존 AI와 같은 기록 행을 유지하며 학생은 추가 수면 항목으로 탐구할 수 있습니다. 현재 AI의 후속 후보는 스마트폰·신체활동입니다.'
+    ];}
+
     function studentRuleEligibleRows(source){return source.filter(r=>r.컨디션좋음여부!==''&&[...CLASSROOM_TREE_FEATURES,TREE_TARGET].every(k=>SleepRecordPolicy.amount(safeCaffeineAnalysisRow(r)[k])!==null));}
     function studentRuleTime(score){return ({1:'안 함',2:'30분 미만',3:'30~60분',4:'60분 이상'})[score]||'확인 필요';}
     function studentRuleProject(row,basis){const r=Object.prototype.hasOwnProperty.call(row,'카페인기록총량_mg')?safeCaffeineAnalysisRow(row):row,amount=Number(r.일일카페인총량_mg),phone=Number(r.취침전스마트폰_점수),activity=Number(r.신체활동_점수);
       return {취침전24h_카페인총량_mg:amount,카페인_비교기준_mg:basis.value??'',카페인_기준판정:basis.value===null?'기준 확인 필요':amount>=basis.value?'기준 이상':'기준 미만',취침전스마트폰_점수:phone,스마트폰_시간범주:studentRuleTime(phone),신체활동_점수:activity,신체활동_시간범주:studentRuleTime(activity),컨디션좋음여부:Number(r.컨디션좋음여부)};
     }
     function studentRulePersonalModel(sid,sourceRows=null){
-      const source=sourceRows||(state?.analysis||[]).filter(r=>r.익명ID===sid),eligible=studentRuleEligibleRows(source),basis=studentRuleBasis('',sid);
-      return {kind:'personal',basis,sourceCount:source.length,excluded:source.length-eligible.length,rows:eligible.map(r=>({...studentRuleProject(r,basis),분석일:r.분석일||''}))};
+      const source=sourceRows||(state?.analysis||[]).filter(r=>r.익명ID===sid),eligible=studentRuleEligibleRows(source),basis=studentRuleBasis('',sid),sleepIndex=studentRuleSleepIndex(source);
+      return {kind:'personal',basis,sourceCount:source.length,excluded:source.length-eligible.length,rows:eligible.map(r=>({...studentRuleProject(r,basis),분석일:r.분석일||'',...studentRuleSleepFields(r,sleepIndex)}))};
     }
     function studentRuleClassModel(ai=classroomTreeModel()){
       const basis=studentRuleBasis(ai.klass),source=(state?.analysis||[]).filter(r=>!ai.klass||String(r.반)===String(ai.klass));
       if(source.some(r=>idText(r.학년).replace(/학년$/,'')!=='2')){basis.value=null;basis.scopeWarning='AI 대상에 2학년 외 또는 학년 미확인 기록이 있어 기준 확인이 필요합니다.';}
-      const rows=ai.rows.map(r=>({...studentRuleProject(r,basis),기준범위:basis.scopeLabel,기준계산_유효학생수:basis.validCount,기준계산_대상학생수:basis.targetCount,기준계산_제외학생수:basis.excludedCount,전처리확정_분석기간:ai.selectedPeriod}));
+      const eligible=studentRuleEligibleRows(source),sleepIndex=studentRuleSleepIndex(source),matrix=eligible.map(r=>Object.fromEntries([...CLASSROOM_TREE_FEATURES,TREE_TARGET].map(k=>[k,Number(safeCaffeineAnalysisRow(r)[k])]))),same=JSON.stringify(matrix)===JSON.stringify(ai.rows),rows=(same?eligible:ai.rows).map(r=>({...studentRuleProject(r,basis),...(!same?studentRuleSleepBlank('AI 입력·수면 연결 확인 필요'):studentRuleSleepFields(r,sleepIndex)),기준범위:basis.scopeLabel,기준계산_유효학생수:basis.validCount,기준계산_대상학생수:basis.targetCount,기준계산_제외학생수:basis.excludedCount,전처리확정_분석기간:ai.selectedPeriod}));
       return {kind:'class',basis,rows,sourceCount:ai.sourceCount,excluded:ai.excluded,aiStatus:ai.status};
     }
     function formatCaffeineDisplay(value){return typeof value==='number'&&Number.isFinite(value)?(Math.sign(value)*Math.round((Math.abs(value)+Number.EPSILON)*10)/10).toFixed(1):'';}
@@ -1245,7 +1280,7 @@ var SleepRecordPolicy = (function () {
       '기준 확인 필요는 0이나 미만이 아닙니다. 체중 미기록·잘못된 값·충돌은 기준 계산에서 제외하며 분모를 표시합니다. 반·전체 평균은 개인 안전한도나 수면 보장이 아닙니다. 분류는 반올림 전 원값으로 하며 카페인 표시값은 소수 첫째 자리로 반올림합니다. 첫 질문은 C열 기준판정으로 필터하고, 표시값을 다시 입력해 분류하지 마세요. 정확한 기준은 숫자 셀의 수식 입력줄에서 확인합니다.',
       '자료 선택: 개인기록이 있으면 본인 파일, 없으면 해당 반의 학생 규칙표 CSV를 기본으로 사용합니다. 같은 반 AI와 같은 자료를 비교하려는 학생도 반 CSV를 선택할 수 있습니다. 반자료도 부족하면 교사와 유효기록·목표분포를 확인하며 나무를 억지로 만들지 않습니다.',
       '교사와 함께: 첫 질문은 학생규칙_활동표 A카페인 총량/B비교 기준/C판정으로 나눕니다. 이후 D폰/E시간 또는 F활동/G시간 중 탐구 목적에 맞는 항목과 기준을 직접 선택하고 한 단계씩 필터합니다. H는 컨디션1/0 결과입니다. 열 순서가 질문 순서는 아닙니다.',
-      '첫 질문의 이상은 ≥, 미만은 <입니다. C열의 기준 이상/기준 미만을 나눕니다. 기준 확인 필요는 따로 보류하고 이상+미만+확인 필요가 전체인지 확인합니다. 기존 연구용 목표초과(>) 변수와 다른 수업용 기준입니다.',
+      '첫 질문은 ‘카페인 하루 최대 섭취량(    mg) 이상을 섭취했나요?’입니다. 이상(≥)은 예로 같은 양을 포함하고, 미만(<)은 아니오입니다. C열의 기준 이상/기준 미만을 나눕니다. 기준 확인 필요는 따로 보류하고 이상+미만+확인 필요가 전체인지 확인합니다. 기존 연구용 목표초과(>) 변수와 다른 수업용 기준입니다.',
       '다음 질문은 선택한 점수와 시간 범주에 맞춰 예/아니오를 정합니다. 예: 30분 이상이면 3·4점/아니오는1·2점. 이 필터는 모든 질문의 고정값이 아닙니다. 이 표의 H열1/0을 확인합니다.',
       '상위 조건은 유지하고 그 가지의 모든 좋음/그 외 기록을 다음 질문으로 다시 나눕니다. 형제 가지로 바꿀 때는 하위 필터를 먼저 해제합니다. 컨디션 결과열(H)은 좋음만 남기도록 필터하지 않습니다.',
       '각 묶음의 전체·좋음·그 외 건수와 좋음÷전체×100을 세어 Docs 나무에 씁니다. 자료 없는 가지는 비율 계산 불가, 동률은 다수결 판단 유보입니다. 개인표 I열은 분석일입니다.',
@@ -1254,11 +1289,11 @@ var SleepRecordPolicy = (function () {
       '개인자료와 반 AI의 표본·기준이 다르면 성능비교가 아니라 질문 방식 차이를 봅니다. 같은 자료 비교에는 반 학생규칙표와 그 반 AI를 사용합니다. 기록은 학생수가 아닌 날짜별 반복 관측입니다. 관찰비율은 원인·미래확률·행동 추천이 아닙니다.',
       '분석 기간: '+m.basis.period+' · 사용 기록 '+m.rows.length+'건 / 대상 주수면 '+m.sourceCount+'건 / AI 입력 결측 제외 '+m.excluded+'건. 날짜 변경 후 전처리를 다시 실행하고 새 파일을 받습니다.',
       '명단/체중 충돌 제외 '+m.basis.conflictCount+'명 · 학년 확인 필요 '+m.basis.scopeUnconfirmedCount+'명.'+(m.basis.scopeWarning?' '+m.basis.scopeWarning:''),
-      '출처 메모: 식품의약품안전처 공식 명칭은 최대 일일섭취권고량(어린이·청소년 체중kg당2.5mg이하)입니다. https://impfood.mfds.go.kr/CFBCC02F02/getCntntsDetail?cntntsMngId=00005&cntntsSn=278410'];}
+      '출처 메모: 식품의약품안전처 공식 명칭은 최대 일일섭취권고량(어린이·청소년 체중kg당2.5mg이하)입니다. https://impfood.mfds.go.kr/CFBCC02F02/getCntntsDetail?cntntsMngId=00005&cntntsSn=278410',...studentRuleSleepGuide(m)];}
     function studentRuleFormatGuide(ws){ws['!cols']=[{wch:115}];ws['!rows']=[];for(const [address,cell]of Object.entries(ws)){if(address.startsWith('!'))continue;cell.s={...(cell.s||{}),alignment:{wrapText:true,vertical:'top'}};ws['!rows'][XLSX.utils.decode_cell(address).r]={hpt:Math.max(32,Math.ceil(String(cell.v).length/52)*17+8)};}}
-    function studentRuleSheet(wb,m,withDate=false){const columns=withDate?[...STUDENT_RULE_COLUMNS,'분석일']:STUDENT_RULE_COLUMNS,rows=m.rows.map(r=>pickColumns(r,columns));const ws=XLSX.utils.json_to_sheet(rows,{header:columns});appendSleepFormattedSheet(wb,ws,'학생규칙_활동표');ws['!autofilter']={ref:ws['!ref']};ws['!cols']=columns.map((_,i)=>({wch:i===2?22:i===8?14:25}));ws['!rows']=[];for(const [address,cell]of Object.entries(ws)){if(address.startsWith('!'))continue;const pos=XLSX.utils.decode_cell(address);cell.s={...(cell.s||{}),alignment:{wrapText:true,vertical:'top'},...(pos.r===0?{font:{bold:true},fill:{fgColor:{rgb:'E8F1FA'}}}:{})};ws['!rows'][pos.r]={hpt:pos.r===0?54:34};}for(let r=1;r<=rows.length;r++){for(const c of [0,1]){const cell=ws[XLSX.utils.encode_cell({r,c})];if(cell&&cell.t==='n')cell.z='0.0';}}}
+    function studentRuleSheet(wb,m,withDate=false){const columns=[...STUDENT_RULE_COLUMNS,...(withDate?['분석일']:[]),...STUDENT_RULE_SLEEP_COLUMNS],rows=m.rows.map(r=>pickColumns(r,columns));const ws=XLSX.utils.json_to_sheet(rows,{header:columns});appendSleepFormattedSheet(wb,ws,'학생규칙_활동표');ws['!autofilter']={ref:ws['!ref']};ws['!cols']=columns.map((name,i)=>({wch:name==='취침시각_분석일0시기준_h'?38:name==='수면연결상태'?30:i===2?22:i===8?14:25}));ws['!rows']=[];for(const [address,cell]of Object.entries(ws)){if(address.startsWith('!'))continue;const pos=XLSX.utils.decode_cell(address);cell.s={...(cell.s||{}),alignment:{wrapText:true,vertical:'top'},...(pos.r===0?{font:{bold:true},fill:{fgColor:{rgb:'E8F1FA'}}}:{})};ws['!rows'][pos.r]={hpt:pos.r===0?54:34};}for(let r=1;r<=rows.length;r++){for(const c of [0,1,columns.indexOf('수면시간_h')]){const cell=ws[XLSX.utils.encode_cell({r,c})];if(cell&&cell.t==='n')cell.z='0.0';}const order=ws[XLSX.utils.encode_cell({r,c:columns.indexOf('취침시각_분석일0시기준_h')})];if(order?.t==='n')order.z='0.00';}}
     function studentRuleSupplementSheets(wb,ai){const m=studentRuleClassModel(ai);studentRuleSheet(wb,m);appendSleepFormattedSheet(wb,XLSX.utils.json_to_sheet(oneColumnSheet(studentRuleGuide(m))),'학생규칙_기준');studentRuleFormatGuide(wb.Sheets['학생규칙_기준']);}
-    function studentRuleCsv(m){const ws=XLSX.utils.json_to_sheet(m.rows,{header:[...STUDENT_RULE_COLUMNS,...STUDENT_RULE_META_COLUMNS]});return '\ufeff'+XLSX.utils.sheet_to_csv(ws);}
+    function studentRuleCsv(m){const ws=XLSX.utils.json_to_sheet(m.rows,{header:[...STUDENT_RULE_COLUMNS,...STUDENT_RULE_META_COLUMNS,...STUDENT_RULE_SLEEP_COLUMNS]});return '\ufeff'+XLSX.utils.sheet_to_csv(ws);}
     function downloadStudentRuleCsv(){if(!classroomTreeReady())return;const m=studentRuleClassModel(classroomTreeModel()),blob=new Blob([studentRuleCsv(m)],{type:'text/csv;charset=utf-8'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='4차시_학생규칙_'+treeTargetLabel()+'_필터표.csv';a.click();URL.revokeObjectURL(a.href);}
     function studentRuleDiagnostic(ai){const m=studentRuleClassModel(ai);return '<div style="margin-top:10px"><b>'+escapeHtml(studentRuleSummary(m))+'</b><p>체중(kg) × 2.5mg/kg · 합성 계산 예시50kg→125mg. 섭취 목표가 아닙니다. 이보다 적게 먹거나 먹지 않아도 됩니다.</p><p>취침 전24h 기록량과 비교하는 수업용 기준입니다. 평균은 개인 안전한도가 아닙니다. 목표량/기본값 대체 없음 · 기준 미확인은0이 아님 · 반올림 전 값으로 ≥/미만 판정.</p>'+(m.basis.scopeWarning?'<p>'+escapeHtml(m.basis.scopeWarning)+'</p>':'')+'<p>개인기록이 없으면 해당 반 학생 규칙표 CSV를 사용합니다. AI3입력 CSV와 같은 '+m.rows.length+'행·목표값이며 기준·판정·시간범주는 AI 입력이 아닙니다.</p></div>';}
 
@@ -4895,10 +4930,10 @@ function researchCaffeineSheets(source, period) {
     function orderedSelectedModel(){return orderedLesson4Model({klass:$('classSelectTree')?.value||'',personal:$('orderedTreeScope')?.value==='personal',sid:$('orderedTreeScope')?.value==='personal'?$('orderedTreeStudent')?.value||null:null});}
     function orderedTreeReason(m){if(m.status==='select_person')return '개인 자료를 선택하세요.';if(m.status==='basis_missing')return '카페인 기준 확인 필요: 체중·대상 학년이 확인되지 않아 첫 분류를 만들지 않았습니다. 뒤 단계는 미탐색이며 대체값을 넣지 않습니다.';if(m.status==='insufficient'){if(!m.sourceCount)return '선택한 범위에 주수면 기록이 없습니다. 학습 단계는 실행하지 않았습니다.';if(!m.rows.length)return '세 입력과 컨디션이 함께 있는 유효 입력이 없습니다. 결측을0으로 채우지 않으며 뒤 단계는 미탐색입니다.';return '유효 기록이 '+m.rows.length+'건으로 최소10건 미만입니다. 후속 학습을 실행하지 않았습니다.';}if(m.status==='fixed_only')return '카페인 첫 기준만 집계했습니다. 스마트폰·신체활동은 검토했지만 유효한 학습 분할이 없습니다.';return '카페인 첫 기준은 교육상 고정입니다. 이후 각 가지에서 스마트폰·신체활동 후보 중 변수와 기준을 선택했습니다.';}
     function orderedTreeDiagnostic(m){return '<div style="padding:12px;background:#f8fafc;border:1px solid var(--line)"><b>'+escapeHtml(m.label+' · 카페인 기준 AI')+'</b><p>'+escapeHtml(studentRuleSummary(m.rule))+'</p><p>체중(kg) × 2.5mg/kg · 섭취 목표가 아닙니다. 반/전체 평균은 개인 안전한도가 아닙니다. 기준 판정은 반올림 전 값으로 이상(≥)/미만(&lt;)을 나눕니다.</p><p>선택 기간: '+escapeHtml(m.selectedPeriod)+'<br>실제 분석일: '+escapeHtml(m.actualPeriod)+'<br>주수면 '+m.sourceCount+'건 → 같은 AI 입력 '+m.rows.length+'건 / 결측 제외 '+m.excluded+'건</p><p>'+m.reasons.map(r=>escapeHtml(r.label)+' 결측·불명 '+r.count+'건').join(' / ')+'<br>사유는 중복되므로 합산하지 않습니다.</p><p><b>카페인 첫 질문은 공통 기준</b>입니다. 뒤에는 각 가지에서 스마트폰·신체활동 후보와 기준을 비교해 선택합니다. 좌우 가지의 다음 질문은 다를 수 있습니다. 후속 질문은 한 경로에서 최대 두 번이며, 유효한 후보가 없으면 결과로 마칩니다. 학생이 직접 정한 뒤 기준과 다를 수 있습니다.</p><p>'+escapeHtml(orderedTreeReason(m))+'</p><p>카페인은 달력 하루가 아닌 취침 전24h 기록 총량입니다. 미기록은0이 아니며 명시적0mg은 유효합니다. 건수는 학생 수가 아닌 날짜별 반복 기록입니다. 개인과 반은 기준값·기록이 달라 동일조건 성능비교가 아닙니다.</p></div>';}
-    function renderOrderedLesson4Svg(m){const tree=m.tree||makeLeaf(m.rows,orderedTreeReason(m));return renderTreeSvg(tree,(feature,threshold,node)=>node?.fixedCaffeine?'취침 전24h 기록 카페인이 '+formatCaffeineDisplay(threshold)+'mg 이상인가요? (교육상 고정)':classroomNodeQuestion(feature,threshold),true,true,{title:m.label+' · 카페인 기준 AI',subtitle:m.actualPeriod+' · '+m.rows.length+'건 · 카페인 비교 기준 '+studentRuleDisplay(m.basis.value),modeLabel:'카페인 공통 기준 + AI가 선택한 후속 질문',compact:true,orderNotice:'카페인 첫 기준은 교육상 고정 · 뒤 질문의 항목과 기준은 각 가지에서 AI가 선택'});}
+    function renderOrderedLesson4Svg(m){const tree=m.tree||makeLeaf(m.rows,orderedTreeReason(m));return renderTreeSvg(tree,(feature,threshold,node)=>node?.fixedCaffeine?'카페인 하루 최대 섭취량('+formatCaffeineDisplay(threshold)+' mg) 이상을 섭취했나요?':classroomNodeQuestion(feature,threshold),true,true,{title:m.label+' · 카페인 기준 AI',subtitle:m.actualPeriod+' · '+m.rows.length+'건 · 카페인 비교 기준 '+studentRuleDisplay(m.basis.value),modeLabel:'카페인 공통 기준 + AI가 선택한 후속 질문',compact:true,orderNotice:'카페인 첫 기준은 교육상 고정 · 뒤 질문의 항목과 기준은 각 가지에서 AI가 선택'});}
     function drawSelectedLesson4Tree(){if(!orderedTreeActive())return drawAiTree();if(!classroomTreeReady())return;const m=orderedSelectedModel();clearTreeImage('real');const panel=$('treePanel');panel.style.display='block';panel.innerHTML=orderedTreeDiagnostic(m)+treeFigureHtml('real',renderOrderedLesson4Svg(m),m.label+'_순서제한AI')+orderedPathSummaryHtml(m);}
     function downloadSelectedLesson4Csv(){if(!orderedTreeActive())return downloadCsv();if(!classroomTreeReady())return;const m=orderedSelectedModel(),ws=XLSX.utils.json_to_sheet(m.rows,{header:m.columns});saveLesson3Blob(new Blob(['\ufeff'+XLSX.utils.sheet_to_csv(ws)],{type:'text/csv;charset=utf-8'}),'4차시_카페인기준AI_'+m.label+'_학습용.csv');}
-    function downloadSelectedStudentRuleCsv(){if(!orderedTreeActive())return downloadStudentRuleCsv();if(!classroomTreeReady())return;const m=orderedSelectedModel(),rows=m.rule.rows.map(r=>({...r,기준범위:m.basis.scopeLabel,기준계산_유효학생수:m.basis.validCount,기준계산_대상학생수:m.basis.targetCount,기준계산_제외학생수:m.basis.excludedCount,전처리확정_분석기간:m.selectedPeriod})),header=[...STUDENT_RULE_COLUMNS,...(m.kind==='personal'?['분석일']:[]),...STUDENT_RULE_META_COLUMNS],ws=XLSX.utils.json_to_sheet(rows,{header});saveLesson3Blob(new Blob(['\ufeff'+XLSX.utils.sheet_to_csv(ws)],{type:'text/csv;charset=utf-8'}),'4차시_학생규칙_'+m.label+'_필터표.csv');}
+    function downloadSelectedStudentRuleCsv(){if(!orderedTreeActive())return downloadStudentRuleCsv();if(!classroomTreeReady())return;const m=orderedSelectedModel(),rows=m.rule.rows.map(r=>({...r,기준범위:m.basis.scopeLabel,기준계산_유효학생수:m.basis.validCount,기준계산_대상학생수:m.basis.targetCount,기준계산_제외학생수:m.basis.excludedCount,전처리확정_분석기간:m.selectedPeriod})),header=[...STUDENT_RULE_COLUMNS,...(m.kind==='personal'?['분석일']:[]),...STUDENT_RULE_META_COLUMNS,...STUDENT_RULE_SLEEP_COLUMNS],ws=XLSX.utils.json_to_sheet(rows,{header});saveLesson3Blob(new Blob(['\ufeff'+XLSX.utils.sheet_to_csv(ws)],{type:'text/csv;charset=utf-8'}),'4차시_학생규칙_'+m.label+'_필터표.csv');}
     function orderedStudentRuleGuide(m){return studentRuleGuide(m.rule).map(line=>line.startsWith('개인자료와 반 AI의')?'이 파일의 학생 규칙표와 AI 입력은 같은 행·목표값입니다. 같은 범위에서 내가 정한 기준과 AI가 학습한 뒤 기준을 비교합니다. 개인과 반의 기준값·자료가 다르면 동일조건 성능비교가 아닙니다.':m.kind!=='personal'?line.replace('개인표 I열은 분석일입니다.','이 반·전체 활동표의 수업 변수는 A:H입니다.'):line).concat(['직접 나무를 작성할 때는 기준·시간이 포함된 학생 규칙표 CSV를 사용합니다. AI 입력 CSV의 네 열은 모델 입력·목표값 판독용입니다.']);}
     function downloadSelectedLesson4Summary(){if(!orderedTreeActive())return downloadAiSummary();if(!classroomTreeReady())return;const m=orderedSelectedModel(),wb=XLSX.utils.book_new(),append=(name,rows)=>appendSleepFormattedSheet(wb,XLSX.utils.json_to_sheet(rows),name);append('활동안내',oneColumnSheet(['같은 개인/반/전체와 같은 기간의 학생 규칙표와 AI 입력으로 비교합니다.','교사와 함께 첫 카페인 기준으로 나눈 뒤, 학생은 예상과 탐구 목적에 따라 다음 항목·기준을 선택합니다. AI는 각 가지에서 후보 항목·기준을 계산해 선택합니다.','AI의 카페인 첫 질문은 체중 기준으로 교육상 고정했습니다. 후속 질문은 기존 표본·개선량 조건을 만족하는 스마트폰·신체활동 후보 중에서 선택합니다. 어느 후보도 유효하지 않으면 실제 결과로 마칩니다.','각 묶음의 전체/좋음/그 외 건수와 비율을 Docs 나무에 작성합니다. 상위 조건은 유지하고 형제 가지로 이동할 때 하위 필터를 해제합니다.','H열 컨디션좋음여부는4~5점=1,1~3점=0이며 입력 특징이 아닙니다. 같은 선택 범위의 학생 표와 AI 행을 사용하세요.','개인과 반은 기준값과 자료가 다르므로 질문 방식과 관찰 패턴 비교이며 성능 비교가 아닙니다.','실제 관측 비율은 인과 효과·미래 확률·최적 행동 추천이 아닙니다.']));append('카페인기준AI_요약',[{항목:'대상',내용:m.label},{항목:'질문 선택',내용:'카페인 첫 기준 공통 → 이후 각 가지에서 폰·활동 후보 중 항목/기준 선택'},{항목:'첫 기준',내용:'교육상 고정: '+studentRuleDisplay(m.basis.value)+' 이상 / 미만'},{항목:'체중 기준',내용:studentRuleSummary(m.rule)},{항목:'선택 기간',내용:m.selectedPeriod},{항목:'실제 분석일',내용:m.actualPeriod},{항목:'주수면',내용:m.sourceCount},{항목:'동일 AI 입력 행',내용:m.rows.length},{항목:'결측 제외',내용:m.excluded},{항목:'학습 후속 질문 수',내용:m.learnedQuestions},{항목:'후속 분기 기준',내용:'기존 후속 기준: 개선량0.10 이상, 각 자식5건 이상. 각 가지에서 폰·활동 후보를 비교하고 최대 두 후속 질문까지 선택. 같은 변수 재사용 가능. 후보 검토는 학습 분기가 아님. 관찰용 fallback 새 적용 없음.'},{항목:'상태',내용:orderedTreeReason(m)},{항목:'보존',내용:'기존 자유학습/연구 모델은 별도 유지. 기준·체중·결과값은 추가 입력 특징이 아님.'}]);append('AI_분기기준',orderedTreeRows(m));appendSleepFormattedSheet(wb,XLSX.utils.json_to_sheet(m.rows,{header:m.columns}),'수업용_AI입력');studentRuleSheet(wb,m.rule,m.kind==='personal');append('학생규칙_기준',oneColumnSheet(orderedStudentRuleGuide(m)));studentRuleFormatGuide(wb.Sheets['학생규칙_기준']);completeOrderedReadingWorkbook(wb,m);XLSX.writeFile(wb,'4차시_카페인기준AI_'+m.label+'_해석요약표.xlsx');}
     function updateOrderedTreeUi(){if(!$('treeLearningMode'))return;const active=orderedTreeActive(),ready=!!state&&!state.identityWarnings?.length&&!lesson3DatesDirty();$('orderedTreeControls').hidden=!active;for(const id of ['orderedTreeScope','orderedTreeStudent'])$(id).disabled=!active||!ready;const personal=$('orderedTreeScope').value==='personal';$('orderedTreeStudent').hidden=!personal;const sel=$('orderedTreeStudent'),prev=sel.value,klass=$('classSelectTree')?.value||'',seen=new Map();if(ready)(state.analysis||[]).filter(r=>!klass||String(r.반)===klass).forEach(r=>{if(r.익명ID&&!seen.has(r.익명ID))seen.set(r.익명ID,r);});sel.innerHTML='<option value="">개인 선택</option>';for(const [id,r]of seen){const opt=document.createElement('option');opt.value=id;opt.textContent=[r.반?r.반+'반':'',r.번호?r.번호+'번':'',r.이름||'개인자료'].filter(Boolean).join(' ');sel.appendChild(opt);}sel.value=seen.has(prev)?prev:'';if(active&&ready)$('classroomTreeDiagnostics').innerHTML=orderedTreeDiagnostic(orderedSelectedModel());}
