@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>카페인·수면 전처리 헬퍼 v73</title>
+  <title>카페인·수면 전처리 헬퍼 v74</title>
   <script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
   <style>
@@ -395,7 +395,7 @@
 </head>
 <body>
   <header>
-    <h1>교사용 카페인·수면 분석자료 생성기 v73</h1>
+    <h1>교사용 카페인·수면 분석자료 생성기 v74</h1>
     <p>교사가 카페인·수면 원자료를 넣으면, 학생 활동에 사용할 반별·개인별 분석 데이터와 AI 분석용 CSV를 자동 생성합니다.</p>
     <p id="publication-update">최근 반영: <time datetime="2026-11-02T10:06:27Z">2026-11-02 19:06:27 한국시간</time>. 학생용 자료를 6열·2탭으로 정리하고 Google Sheets 호환성을 위한 저장 구조를 조정했습니다. 변환 기준은 활동안내에서 확인하세요. 이전 화면이면 파일 선택 전에 Ctrl+F5로 새로고침하세요.</p>
   </header>
@@ -446,14 +446,17 @@
       <section class="panel content">
         <h2>결과</h2>
         <div id="message" class="notice warn">이 앱은 교사용 전처리 도구입니다. 학생에게는 원자료가 아닌 익명화된 분석 자료 또는 개인별 자료만 제공합니다.</div>
-        <div class="notice">
+        <details class="notice" id="classificationGuide">
+          <summary>분류 기준 자세히 보기</summary>
+          <div>
           <strong>수면시간과 기상 후 컨디션을 각각 확인합니다</strong><br>
           수면시간: 8시간 미만 → 권장보다 짧음 · 8~10시간 → 권장 범위 · 10시간 초과 → 권장보다 김<br>
           수업용 컨디션 v3: 3~5점 → 보통 이상 · 1~2점 → 낮음 · 빈칸 → 판정 불가. 연구용 기존4~5점 지표는 유지<br>
           예: 6시간을 자고 컨디션이 3점이면 수면시간 구간0 / 수업용 컨디션 보통 이상입니다.<br>
           4차시 수업용 의사결정트리는 보통 이상(3~5점)/낮음(1~2점)을 분석합니다. 원점수와 기존 연구용 컨디션 좋음(4~5점) 지표는 유지합니다. 잠들기·밤중 각성·낮 졸림은 각각 살펴봅니다.<br>
           <small>13~18세 권장 수면시간을 참고한 안내입니다. 보통 이상/낮음은 수업용 응답 구분이며 건강등급·임상 진단·SHI·PSQI 점수가 아닙니다.</small>
-        </div>
+          </div>
+        </details>
         <div class="notice">수업용 예시 데이터는 2·4·6차시의 학생 선택에서 개별 저장할 수 있습니다. ZIP 포함 여부는 각 차시에서 선택하세요. 반별 자료·비교·연구용 엑셀에는 항상 포함되지 않습니다.</div>
 
         <div class="metrics" id="metrics"></div>
@@ -512,6 +515,7 @@
           </div>
           <div class="dl-row" data-lesson="4">
             <span class="dl-label">[4차시] 의사결정트리 분석</span>
+            <p id="lesson4ConditionGuide" style="flex:0 0 100%;margin:0">조건별로 기상 후 컨디션을 비교합니다.</p>
             <div class="dl-controls tree-analysis-controls">
               <label>AI 방식 <select id="treeLearningMode"><option value="ordered">카페인 섭취 여부 후 AI 탐색</option><option value="free">기존 자유학습 AI (반·전체)</option></select></label><span id="orderedTreeControls"><label>대상 <select id="orderedTreeScope"><option value="class">반·전체 자료</option><option value="personal">개인 자료</option></select></label><select id="orderedTreeStudent" aria-label="카페인 기준 AI 개인 선택"><option value="">개인 선택</option></select></span>
               <select id="classSelectTree"><option value="">전체</option></select>
