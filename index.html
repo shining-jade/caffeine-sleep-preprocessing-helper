@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>카페인·수면 전처리 헬퍼 v74</title>
+  <title>카페인·수면 전처리 헬퍼 v75</title>
   <script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
   <style>
@@ -399,9 +399,9 @@
 </head>
 <body>
   <header>
-    <h1>교사용 카페인·수면 분석자료 생성기 v74</h1>
+    <h1>교사용 카페인·수면 분석자료 생성기 v75</h1>
     <p>교사가 카페인·수면 원자료를 넣으면, 학생 활동에 사용할 반별·개인별 분석 데이터와 AI 분석용 CSV를 자동 생성합니다.</p>
-    <p id="publication-update">최근 반영: <time datetime="2026-11-02T10:06:27Z">2026-11-02 19:06:27 한국시간</time>. 학생용 자료를 6열·2탭으로 정리하고 Google Sheets 호환성을 위한 저장 구조를 조정했습니다. 변환 기준은 활동안내에서 확인하세요. 이전 화면이면 파일 선택 전에 Ctrl+F5로 새로고침하세요.</p>
+    <p id="publication-update">최근 반영: <time datetime="2026-11-06T07:04:19Z">2026-11-06 16:04:19 한국시간</time>. 6차시 전후비교에 반별 관찰 기간 자동 입력과 개인용 엑셀 요약·그래프 시트를 반영했습니다. 이전 화면이면 파일 선택 전에 Ctrl+F5로 새로고침하세요.</p>
   </header>
 
   <main>
@@ -534,18 +534,18 @@
             <div id="treePanel" style="display:none; margin-top:12px; flex:0 0 100%; width:100%;"></div>
           </div>
           <div class="dl-row" data-lesson="6">
-            <span class="dl-label">[6차시] 초기 관찰구간 ↔ 종료 관찰구간</span>
+            <span class="dl-label">[6차시] 목표 세우기 전 ↔ 실천 기간</span>
             <div class="dl-controls">
-              <span style="font-size:12px">초기 관찰구간</span><input id="beforeExperimentStart" type="date" title="처음 기록 시작일" />
+              <span style="font-size:12px">앞 기간</span><input id="beforeExperimentStart" type="date" title="앞 기간 시작일" />
               <span style="font-size:12px; color:#667085;">~</span>
-              <input id="beforeExperimentEnd" type="date" title="처음 기록 종료일" />
+              <input id="beforeExperimentEnd" type="date" title="앞 기간 종료일" />
               <span style="font-size:12px; color:#667085;">비교</span>
-              <span style="font-size:12px">종료 관찰구간</span><input id="experimentStart" type="date" title="마지막 실천 시작일" />
+              <span style="font-size:12px">뒤 기간 (5차시~6차시 전날)</span><input id="experimentStart" type="date" title="뒤 기간 시작일" />
               <span style="font-size:12px; color:#667085;">~</span>
-              <input id="experimentEnd" type="date" title="마지막 실천 종료일" />
+              <input id="experimentEnd" type="date" title="뒤 기간 종료일" />
               <select id="classSelectCompare"><option value="">반 선택</option></select>
               <button type="button" class="secondary" onclick="applyClassObservationPeriod()">반별 실제 일정 적용</button>
-              <label class="checkbox-choice"><input id="useClassObservationPeriods" type="checkbox" checked>논문용 출력에 반별 실제 일정 적용 · 수동 날짜를 사용하려면 해제</label><small>기간 길이가 다르면 관찰일수와 기록률을 함께 확인합니다. 일정이 바뀌면 수동 날짜로 설정하세요.</small>
+              <label class="checkbox-choice"><input id="useClassObservationPeriods" type="checkbox" checked>논문용 출력에 반별 실제 일정 적용 · 수동 날짜를 사용하려면 해제</label><small>기간 길이가 다르면 관찰일수와 기록률을 함께 확인합니다. 일정이 바뀌면 수동 날짜로 설정하세요.</small><small>분석 시작일을 10-06 이전으로 설정해야 모든 반의 앞 기간이 포함됩니다.</small>
               <select id="studentCompareSelect"><option value="">학생 선택</option></select>
               <button id="downloadBeforeAfterOne" class="secondary" disabled>📥 6차시용 개인 전후 비교 자료</button>
               <button id="downloadBeforeAfter" class="secondary" disabled>📥 6차시용 전후 비교 자료 (반)</button>
@@ -2896,10 +2896,10 @@ function researchCaffeineSheets(source, period) {
     }
 
     function updateBeforeAfterButtons() {
-      const hasPeriod = !!parseDateFlexible($("beforeExperimentStart")?.value)
+      const hasPeriod = $("useClassObservationPeriods")?.checked || (!!parseDateFlexible($("beforeExperimentStart")?.value)
         && !!parseDateFlexible($("beforeExperimentEnd")?.value)
         && !!parseDateFlexible($("experimentStart")?.value)
-        && !!parseDateFlexible($("experimentEnd")?.value);
+        && !!parseDateFlexible($("experimentEnd")?.value));
       const hasRows = compareStudentOptions().length > 0;
       if ($("downloadBeforeAfter")) $("downloadBeforeAfter").disabled = !state || !hasPeriod || !rowsForBeforeAfterSelection().length || !!state.identityWarnings?.length;
       if ($("downloadBeforeAfterZip")) $("downloadBeforeAfterZip").disabled = !state || !hasPeriod || !hasRows;
@@ -4717,16 +4717,20 @@ function researchCaffeineSheets(source, period) {
       return String(str || "").replace(/[\\/:*?"<>|]/g, "_");
     }
 
+    const CLASS_COMPARE_PERIODS = {
+      "1": ["2026-10-12","2026-11-05","2026-11-06","2026-11-12"],
+      "2": ["2026-10-16","2026-11-05","2026-11-06","2026-11-12"],
+      "3": ["2026-10-06","2026-11-03","2026-11-04","2026-11-10"],
+      "4": ["2026-10-06","2026-11-03","2026-11-04","2026-11-09"]
+    };
     function getClassObservationPeriods() {
-      const values={"1":["2026-10-19","2026-10-25","2026-11-16","2026-11-22"],"2":["2026-10-22","2026-10-29","2026-11-19","2026-11-25"],"3":["2026-10-13","2026-10-19","2026-11-10","2026-11-16"],"4":["2026-10-14","2026-10-19","2026-11-10","2026-11-16"]};
-      return Object.fromEntries(Object.entries(values).map(([klass,v])=>[klass,{preStart:parseDateFlexible(v[0]),preEnd:parseDateFlexible(v[1]),start:parseDateFlexible(v[2]),end:parseDateFlexible(v[3])}]));
+      return Object.fromEntries(Object.entries(CLASS_COMPARE_PERIODS).map(([klass,v])=>[klass,{preStart:parseDateFlexible(v[0]),preEnd:parseDateFlexible(v[1]),start:parseDateFlexible(v[2]),end:parseDateFlexible(v[3])}]));
     }
-
     function applyClassObservationPeriod() {
-      const periods={"1":["2026-10-19","2026-10-25","2026-11-16","2026-11-22"],"2":["2026-10-22","2026-10-29","2026-11-19","2026-11-25"],"3":["2026-10-13","2026-10-19","2026-11-10","2026-11-16"],"4":["2026-10-14","2026-10-19","2026-11-10","2026-11-16"]};
       const klass=String($("classSelectCompare")?.value||"").replace(/^2[- ]/,"");
-      const selected=periods[klass];if(!selected){alert("반을 선택해주세요.");return;}
+      const selected=CLASS_COMPARE_PERIODS[klass];if(!selected){alert("반을 선택해주세요.");return;}
       ["beforeExperimentStart","beforeExperimentEnd","experimentStart","experimentEnd"].forEach((id,i)=>$(id).value=selected[i]);
+      updateBeforeAfterButtons();
     }
 
     function getBeforeAfterPeriod() {
@@ -4739,16 +4743,16 @@ function researchCaffeineSheets(source, period) {
       const start = parseDateFlexible($("experimentStart").value);
       const end = parseDateFlexible($("experimentEnd").value);
       if (!preStart || !preEnd || !start || !end) {
-        alert("처음 기록 시작일/종료일과 마지막 실천 시작일/종료일을 모두 입력해주세요.");
+        alert("앞 기간 시작일/종료일과 뒤 기간 시작일/종료일을 모두 입력해주세요.");
         return null;
       }
       if (preEnd < preStart) {
-        alert("처음 기록 종료일은 시작일보다 빠를 수 없습니다.");
+        alert("앞 기간 종료일은 시작일보다 빠를 수 없습니다.");
         return null;
       }
-      if (end < start) { alert("마지막 실천 종료일은 시작일보다 빠를 수 없습니다."); return null; }
+      if (end < start) { alert("뒤 기간 종료일은 시작일보다 빠를 수 없습니다."); return null; }
 
-      if (preEnd >= start) { alert("종료 관찰구간는 초기 관찰구간 이후로 지정해주세요."); return null; }
+      if (preEnd >= start) { alert("뒤 기간은 앞 기간 이후로 지정해주세요."); return null; }
       return { preStart, preEnd, start, end, preDays: Math.round((preEnd-preStart)/86400000)+1, endDays: Math.round((end-start)/86400000)+1 };
     }
 
@@ -4773,7 +4777,49 @@ function researchCaffeineSheets(source, period) {
       return grouped;
     }
 
-    function beforeAfterSummaryRow(info, before, during) {
+    // Lesson 6 calendar days only. Same known/unknown rules as researchCaffeineSheets.
+    function calendarCaffeineDays(sid, start, end, afternoonHour, source = state) {
+      const grouped=new Map();
+      for(const row of source?.rawCaffeine || []) {
+        if(idText(identityValue(row,['전체학번','학번','학생ID']))!==idText(sid))continue;
+        const intake=parseDateTimeFlexible(value(row,['섭취시간','섭취 시간']));
+        if(!intake)continue;
+        const day=dateKey(intake);if(!inDateRange(day,start,end))continue;
+        const raw=value(row,['함량','카페인(mg)','카페인mg','카페인']),mg=num(raw);
+        const known=String(raw??'').trim()!==''&&mg!==null&&mg>=0;
+        if(!grouped.has(day))grouped.set(day,[]);
+        grouped.get(day).push({mg:known?mg:0,known,late:known&&mg>0&&intake.getHours()>=afternoonHour});
+      }
+      const days=[];
+      for(let day=start;day&&end&&day<=end;day=addDays(day,1)){
+        const date=dateKey(day),records=grouped.get(date)||[],missing=records.some(r=>!r.known),positive=records.some(r=>r.mg>0);
+        days.push({날짜:date,기록상태:!records.length?'미기록':missing?(positive?'섭취 기록·함량 누락':'함량 누락'):positive?'섭취 기록':'명시적 0mg 기록',
+          기록기반총량_mg:records.length&&!missing?records.reduce((s,r)=>s+r.mg,0):'',오후섭취여부:records.length&&!missing?(records.some(r=>r.late)?1:0):''});
+      }
+      return days;
+    }
+    function beforeAfterResult(a,b,an,bn,threshold,unit,precision) {
+      if(an<2||bn<2||a===''||b==='')return '기록이 적어 비교 어려워요';
+      const delta=round(b-a,4);if(Math.abs(delta)<threshold)return '비슷해요';
+      return (delta>0?'늘었어요 (+':'줄었어요 (−')+Math.abs(delta).toFixed(precision)+unit+')';
+    }
+    function beforeAfterMetricRows(row, forStudent = false) {
+      const hour=Number($('afternoonHour')?.value||state?.options?.afternoonHour||15);
+      const displayHour=hour>12?hour-12:hour;
+      const labels=['평균 수면시간(시간)','평균 기상 후 컨디션(1~5점)','하루 평균 카페인(mg)',
+        '오후 '+displayHour+'시 이후 카페인 마신 날(%)','자기 전 폰 30분 이상 쓴 날(%)'];
+      return labels.map((label,i)=>{
+        const result={항목:label,'앞 기간':row['앞 기간 '+label]??'','뒤 기간':row['뒤 기간 '+label]??'',변화:row[label+' 변화']??'',결과:row[label+' 결과']??'기록이 적어 비교 어려워요','앞 기록일수':row[label+' 앞 기록일수']??0,'뒤 기록일수':row[label+' 뒤 기록일수']??0};
+        if(!forStudent)return result;
+        const precision=i<2?1:0;
+        const a=result['앞 기간']===''?'':round(result['앞 기간'],precision);
+        const b=result['뒤 기간']===''?'':round(result['뒤 기간'],precision);
+        return {...result,'앞 기간':a,'뒤 기간':b,변화:a===''||b===''?'':round(b-a,precision),
+          결과:beforeAfterResult(a,b,result['앞 기록일수'],result['뒤 기록일수'],[.25,.2,10,10,10][i],['시간','점','mg','%p','%p'][i],precision)};
+      });
+    }
+
+    function beforeAfterSummaryRow(info, before, during, period) {
         const beforeSleep = avgNumber(before, "수면시간_h");
         const duringSleep = avgNumber(during, "수면시간_h");
         const beforeCond = avgNumber(before, "수면컨디션_점수");
@@ -4788,9 +4834,9 @@ function researchCaffeineSheets(source, period) {
         const duringRealCaffeine = during.filter(row => knownCaffeineValue(row) !== null && knownCaffeineValue(row) > 0).length;
         const beforeAvgCaffeine = avgNumber(before, "카페인기록총량_mg");
         const duringAvgCaffeine = avgNumber(during, "카페인기록총량_mg");
-        const beforePhone = before.filter(row => Number(row.취침전스마트폰_점수) >= 4).length;
-        const duringPhone = during.filter(row => Number(row.취침전스마트폰_점수) >= 4).length;
-        return {
+        const beforePhone = before.filter(row => Number(row.취침전스마트폰_점수) >= 3).length;
+        const duringPhone = during.filter(row => Number(row.취침전스마트폰_점수) >= 3).length;
+        const summary = {
           ...(info._classroomExample ? { _classroomExample: true } : {}),
           반: info.반 || "",
           번호: info.번호 || "",
@@ -4823,51 +4869,91 @@ function researchCaffeineSheets(source, period) {
           "처음 기록 평균 카페인총량_mg": beforeAvgCaffeine,
           "마지막 실천 평균 카페인총량_mg": duringAvgCaffeine,
           "평균 카페인총량 변화_mg": beforeAvgCaffeine === "" || duringAvgCaffeine === "" ? "" : round(duringAvgCaffeine - beforeAvgCaffeine, 2),
-          "처음 기록 취침전 스마트폰 60분 이상 일수": beforePhone,
-          "마지막 실천 취침전 스마트폰 60분 이상 일수": duringPhone,
+          "처음 기록 취침전 스마트폰 30분 이상 일수": beforePhone,
+          "마지막 실천 취침전 스마트폰 30분 이상 일수": duringPhone,
           "스마트폰 사용 변화": duringPhone - beforePhone,
         };
+        // Keep legacy sleep-window caffeine columns explicitly marked as references.
+        for(const key of Object.keys(summary))if(/카페인|0mg/.test(key)){summary['참고_취침전24시간_'+key]=summary[key];delete summary[key];}
+        const present=(rows,key)=>rows.filter(r=>r[key]!==''&&r[key]!==null&&r[key]!==undefined&&Number.isFinite(Number(r[key])));
+        const phone=rows=>rows.filter(r=>[1,2,3,4].includes(Number(r.취침전스마트폰_점수))&&r.취침전스마트폰_점수!=='');
+        const source=info._classroomExample?state?.classroom:state;
+        const hour=Number($('afternoonHour')?.value||state?.options?.afternoonHour||15);
+        const sid=info._학번??info.학번??'';
+        const left=period?calendarCaffeineDays(sid,period.preStart,period.preEnd,hour,source):[];
+        const right=period?calendarCaffeineDays(sid,period.start,period.end,hour,source):[];
+        const validC=rows=>rows.filter(r=>r.기록기반총량_mg!=='');
+        const ratio=(rows,key,passes)=>rows.length?Math.round(rows.filter(r=>passes(Number(r[key]))).length/rows.length*100):'';
+        const aPhone=phone(before),bPhone=phone(during),aC=validC(left),bC=validC(right);
+        const values=[
+          [beforeSleep,duringSleep,present(before,'수면시간_h').length,present(during,'수면시간_h').length,.25,'시간',1],
+          [beforeCond,duringCond,present(before,'수면컨디션_점수').length,present(during,'수면컨디션_점수').length,.2,'점',1],
+          [avgNumber(aC,'기록기반총량_mg'),avgNumber(bC,'기록기반총량_mg'),aC.length,bC.length,10,'mg',0],
+          [ratio(aC,'오후섭취여부',v=>v===1),ratio(bC,'오후섭취여부',v=>v===1),aC.length,bC.length,10,'%p',0],
+          [ratio(aPhone,'취침전스마트폰_점수',v=>v>=3),ratio(bPhone,'취침전스마트폰_점수',v=>v>=3),aPhone.length,bPhone.length,10,'%p',0]
+        ];
+        const labels=beforeAfterMetricRows({}).map(r=>r.항목);
+        values.forEach(([a,b,an,bn,t,u,p],i)=>{
+          const label=labels[i];summary['앞 기간 '+label]=a;summary['뒤 기간 '+label]=b;
+          summary[label+' 변화']=a===''||b===''?'':round(b-a,2);
+          summary[label+' 결과']=beforeAfterResult(a,b,an,bn,t,u,p);
+          summary[label+' 앞 기록일수']=an;summary[label+' 뒤 기록일수']=bn;
+        });
+        return summary;
     }
 
-    function beforeAfterWorkbook(summary, detailRows, period) {
-      const wb = XLSX.utils.book_new();
-      appendSleepFormattedSheet(wb, XLSX.utils.json_to_sheet(oneColumnSheet([
-        "이 파일은 6차시 처음 기록·마지막 실천 비교 활동용입니다. 반별 일정 모드는 요약표의 학생별 날짜를 확인합니다.",
-        `처음 기록 기간: ${dateKey(period.preStart)} ~ ${dateKey(period.preEnd)}`,
-        `마지막 실천: ${dateKey(period.start)} ~ ${dateKey(period.end)}`,
-        "1. 전후비교_요약 시트에서 처음 기록과 마지막 실천의 변화를 확인합니다.",
-        "2. 수면시간, 컨디션, 카페인 섭취, 스마트폰 사용 중 변화가 큰 항목을 찾습니다.",
-        "그래프용 시트는 항목 / 처음 기록 / 마지막 실천의 세 열로 제공합니다. 개인 파일은 첫 4개 항목으로 묶은 세로 막대 차트를 만들고, 마지막 카페인(mg) 항목은 별도 그래프로 비교하세요.",
-        "오후 카페인은 실제 음료 섭취 횟수가 아니라 오후에 섭취한 기록일수입니다. 비교 기간의 길이가 다르면 일수를 직접 비교할 때 주의하세요.",
-        "3. 변화가 내 행동 실험 때문인지, 다른 요인 때문일 수도 있는지 생각합니다.",
-        "4. 앞으로 유지할 행동 1가지를 정합니다.",
-        "0mg은 카페인을 마시지 않았다는 명시적 기록이므로 행동 변화의 근거로 사용할 수 있습니다.",
-        "평균 카페인총량은 함량이 확인된 기록일만 사용합니다. 명시적 0mg은 포함하고 미기록·함량 누락은 제외합니다. 취침 전 24시간 수업용 지표이며 논문용 달력 날짜 집계와 구분합니다.",
-        "빈칸은 미섭취가 아니라 기록 누락 가능성이 있으므로 전후 비교에서 따로 확인해야 합니다.",
-      ])), "활동안내");
-      appendSleepFormattedSheet(wb, XLSX.utils.json_to_sheet(summary), "전후비교_요약");
-      const chartRows = summary.flatMap(row => {
-        const items = [
-          ["평균 수면시간(시간)", "평균 수면시간"],
-          ["수면 컨디션 점수", "평균 컨디션 점수"],
-          ["오후 카페인 섭취일수", "오후 카페인 섭취일수"],
-          ["취침 전 스마트폰 60분 이상 일수", "취침전 스마트폰 60분 이상 일수"],
-          ["하루 카페인 총량(mg)", "평균 카페인총량_mg"]
-        ];
-        return items.map(([label, suffix]) => ({
-          ...(summary.length > 1 ? { 학생: `${row.전체학번 || ""} ${row.성명 || ""}`.trim() } : {}),
-          항목: label, "처음 기록": row[`처음 기록 ${suffix}`], "마지막 실천": row[`마지막 실천 ${suffix}`]
-        }));
-      });
-      appendSleepFormattedSheet(wb, XLSX.utils.json_to_sheet(chartRows), "그래프용");
-      if (detailRows?.length) appendSleepFormattedSheet(wb, XLSX.utils.json_to_sheet(detailRows), "기간별_원자료");
-      appendSleepFormattedSheet(wb, XLSX.utils.json_to_sheet(questionSheet([
-        "처음 기록과 마지막 실천에 가장 크게 달라진 항목은 무엇인가요?",
-        "그 변화가 행동 실험 때문이라고 볼 근거는 무엇인가요?",
-        "다른 요인이 영향을 주었을 가능성은 무엇인가요?",
-        "앞으로 유지할 행동 1가지를 적어보세요.",
-      ])), "성찰질문");
-      return summary.some(row => row._classroomExample) ? labelExampleWorkbook(wb) : appendProcessingSummary(wb);
+    function beforeAfterWorkbook(summary, detailRows, period, individual = false) {
+      const wb=XLSX.utils.book_new(),first=summary[0]||{};
+      const selected=individual&&first.초기시작일?{preStart:parseDateFlexible(first.초기시작일),preEnd:parseDateFlexible(first.초기종료일),start:parseDateFlexible(first.종료시작일),end:parseDateFlexible(first.종료종료일)}:period;
+      const days=(a,b)=>Math.round((b-a)/86400000)+1;
+      const guide=[individual?'6차시 전후 비교 자료 — 본인 자료만 확인합니다.':'6차시 전후 비교 자료 — 교사용 반 파일입니다. 반별 일정 모드는 요약표의 학생별 날짜를 확인합니다.',
+        '앞 기간(목표 세우기 전): '+dateKey(selected.preStart)+' ~ '+dateKey(selected.preEnd)+' ('+days(selected.preStart,selected.preEnd)+'일)',
+        '뒤 기간(실천 기간): '+dateKey(selected.start)+' ~ '+dateKey(selected.end)+' ('+days(selected.start,selected.end)+'일)',
+        '1. [전후비교_요약] 시트의 5항목을 활동지 표에 옮겨 적습니다.',
+        individual?'2. [그래프용] 시트의 A1:C3을 선택해 묶은 세로 막대그래프를 만듭니다.':'2. [그래프용] 시트에서 해당 학생의 두 항목을 선택해 묶은 세로 막대그래프를 만듭니다.',
+        "두 기간의 길이가 달라서 오후 카페인과 폰 사용은 '기록한 날 중 몇 %'로 비교합니다.",
+        '평균은 기록한 날만으로 계산합니다. 기록 안 한 날을 0으로 넣지 않습니다.',
+        ...(!individual?['카페인은 달력 날짜(0시~24시) 기준입니다. 그날 마신 양을 그날로 셉니다.']:[]),
+        '수면시간은 취침~기상 시각 사이의 시간이에요.',
+        '함께 변했다고 해서 원인이라고 단정할 수는 없어요.'];
+      appendSleepFormattedSheet(wb,XLSX.utils.json_to_sheet(oneColumnSheet(guide)),'활동안내');
+      const vertical=individual?beforeAfterMetricRows(first,true):summary;
+      const ws=XLSX.utils.json_to_sheet(vertical);appendSleepFormattedSheet(wb,ws,'전후비교_요약');
+      if(individual){
+        ws['!cols']=[28,10,10,10,26,12,12].map(wch=>({wch}));ws['!freeze']={ySplit:1,topLeftCell:'A2'};
+        ws['!rows']=[{hpt:32},...vertical.map(()=>({hpt:44}))];
+        for(const [address,cell]of Object.entries(ws)){if(address.startsWith('!'))continue;const p=XLSX.utils.decode_cell(address);cell.s={font:{sz:11,...(p.r===0?{bold:true}:{})},alignment:{wrapText:true,vertical:'center'}};if(p.r>0&&p.c>=1&&p.c<=3&&cell.t==='n'){cell.z=p.r<=2?'0.0':'0';delete cell.w;}}
+      }
+      const chartRows=summary.flatMap(row=>beforeAfterMetricRows(row,individual).slice(0,2).map((r,i)=>({...(individual?{}:{학생:[row.전체학번,row.성명].filter(Boolean).join(' ')}),항목:i===0?'평균 수면시간(시간)':'평균 컨디션(점)','앞 기간':r['앞 기간'],'뒤 기간':r['뒤 기간']})));
+      appendSleepFormattedSheet(wb,XLSX.utils.json_to_sheet(chartRows,{header:individual?['항목','앞 기간','뒤 기간']:['학생','항목','앞 기간','뒤 기간']}),'그래프용');
+      if(individual)for(const address of ['B2','C2','B3','C3']){const cell=wb.Sheets.그래프용[address];if(cell?.t==='n'){cell.z='0.0';delete cell.w;}}
+      wb.Sheets.그래프용['!cols']=(individual?[28,12,12]:[24,28,12,12]).map(wch=>({wch}));
+      if(!individual)appendSleepFormattedSheet(wb,XLSX.utils.json_to_sheet(detailRows||[]),'기간별_원자료');
+      appendProcessingSummary(wb);
+      if(summary.some(row=>row._classroomExample)){
+        labelExampleWorkbook(wb);
+        // Keep the existing example notice in the guide, with the required four tabs.
+        const notice=XLSX.utils.sheet_to_json(wb.Sheets['수업용 예시 안내']).map(r=>r.내용).join(' · ');
+        wb.Sheets.활동안내.A2.v='수업용 예시 데이터 — '+notice;delete wb.Sheets.활동안내.A2.w;
+        delete wb.Sheets['수업용 예시 안내'];wb.SheetNames=wb.SheetNames.filter(n=>n!=='수업용 예시 안내');
+      }
+      wb.Sheets.활동안내['!cols']=[{wch:115}];wb.Sheets.활동안내['!rows']=[{hpt:24},...guide.map(()=>({hpt:42}))];
+      if(summary.some(row=>row._classroomExample))wb.Sheets.활동안내['!rows'][1]={hpt:96};
+      for(const [address,cell]of Object.entries(wb.Sheets.활동안내))if(!address.startsWith('!'))cell.s={alignment:{wrapText:true,vertical:'center'}};
+      return wb;
+    }
+    async function beforeAfterWorkbookBytes(wb) {
+      const bytes=XLSX.write(wb,{bookType:'xlsx',type:'array'});
+      const index=wb.SheetNames.indexOf('전후비교_요약');if(index<0||!wb.Sheets.전후비교_요약['!freeze'])return bytes;
+      const zip=await JSZip.loadAsync(bytes),path='xl/worksheets/sheet'+(index+1)+'.xml';
+      let xml=await zip.file(path).async('string');
+      const views='<sheetViews><sheetView workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/><selection pane="bottomLeft" activeCell="A2" sqref="A2"/></sheetView></sheetViews>';
+      xml=/<sheetViews[\s\S]*?<\/sheetViews>/.test(xml)?xml.replace(/<sheetViews[\s\S]*?<\/sheetViews>/,views):xml.replace('<sheetData>',views+'<sheetData>');
+      zip.file(path,xml);return zip.generateAsync({type:'uint8array'});
+    }
+    async function writeBeforeAfterWorkbook(wb,name) {
+      try{const bytes=await beforeAfterWorkbookBytes(wb);saveLesson3Blob(new Blob([bytes],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}),name);}
+      catch(error){alert('6차시 Excel 생성 중 오류: '+error.message);}
     }
 
     function buildBeforeAfterEntries(rows, period) {
@@ -4876,12 +4962,12 @@ function researchCaffeineSheets(source, period) {
         const selected=period.byClass?.[String(info.반).replace(/^2[- ]/,"")]||period;
         const before = studentRows.filter(row => inDateRange(row.분석일, selected.preStart, selected.preEnd));
         const during = studentRows.filter(row => inDateRange(row.분석일, selected.start, selected.end));
-        const detailRows = before.map(row => ({ 구분: "처음 기록", ...row })).concat(during.map(row => ({ 구분: "마지막 실천", ...row })));
-        return { sid, info, before, during, detailRows, summary: {...beforeAfterSummaryRow(info, before, during),초기시작일:dateKey(selected.preStart),초기종료일:dateKey(selected.preEnd),종료시작일:dateKey(selected.start),종료종료일:dateKey(selected.end),초기관찰일수:Math.round((selected.preEnd-selected.preStart)/86400000)+1,종료관찰일수:Math.round((selected.end-selected.start)/86400000)+1} };
+        const detailRows = before.map(row => ({ 구분: "앞 기간", ...row })).concat(during.map(row => ({ 구분: "뒤 기간", ...row })));
+        return { sid, info, before, during, detailRows, summary: {...beforeAfterSummaryRow(info, before, during, selected),초기시작일:dateKey(selected.preStart),초기종료일:dateKey(selected.preEnd),종료시작일:dateKey(selected.start),종료종료일:dateKey(selected.end),초기관찰일수:Math.round((selected.preEnd-selected.preStart)/86400000)+1,종료관찰일수:Math.round((selected.end-selected.start)/86400000)+1} };
       });
     }
 
-    function downloadBeforeAfter() {
+    async function downloadBeforeAfter() {
       if (!requireResolvedIdentity()) return;
       const period = getBeforeAfterPeriod();
       if (!period) return;
@@ -4893,10 +4979,10 @@ function researchCaffeineSheets(source, period) {
       const wb = beforeAfterWorkbook(summary, detailRows, period);
       const klass = $("classSelectCompare").value;
       const suffix = klass ? `${klass}반` : "전체";
-      XLSX.writeFile(wb, `6차시_전후비교자료_${suffix}.xlsx`);
+      await writeBeforeAfterWorkbook(wb, `6차시_전후비교자료_${suffix}.xlsx`);
     }
 
-    function downloadBeforeAfterOne() {
+    async function downloadBeforeAfterOne() {
       const period = getBeforeAfterPeriod();
       if (!period) return;
       const sid = $("studentCompareSelect")?.value;
@@ -4905,11 +4991,11 @@ function researchCaffeineSheets(source, period) {
       const entries = buildBeforeAfterEntries(rows, period);
       if (!entries.length) { alert("선택한 학생의 전후 비교 데이터가 없습니다."); return; }
       const entry = entries[0];
-      const wb = beforeAfterWorkbook([entry.summary], entry.detailRows, period);
+      const wb = beforeAfterWorkbook([entry.summary], entry.detailRows, period, true);
       const info = entry.info || {};
       const studentId = safeFileName(info._학번 || info.학번 || "unknown");
       const name = safeFileName(info.이름 || "이름없음");
-      XLSX.writeFile(wb, beforeAfterFileName(info));
+      await writeBeforeAfterWorkbook(wb, beforeAfterFileName(info));
     }
 
     async function downloadBeforeAfterZip() {
@@ -4940,10 +5026,10 @@ function researchCaffeineSheets(source, period) {
           bar.style.width = `${Math.round((i / entries.length) * 100)}%`;
           const entry = entries[i];
           const info = entry.info || {};
-          const wb = beforeAfterWorkbook([entry.summary], entry.detailRows, period);
+          const wb = beforeAfterWorkbook([entry.summary], entry.detailRows, period, true);
           const studentId = safeFileName(info._학번 || info.학번 || "unknown");
           const name = safeFileName(info.이름 || "이름없음");
-          const bytes = XLSX.write(wb, { bookType: "xlsx", type: "array" });
+          const bytes = await beforeAfterWorkbookBytes(wb);
           zip.file(beforeAfterFileName(info), bytes);
 
           await new Promise(resolve => setTimeout(resolve, 0));
@@ -5123,7 +5209,8 @@ function researchCaffeineSheets(source, period) {
     $("studentSelect").addEventListener("change", updateLessonDownloadButtons);
     $("includeExampleStudent").addEventListener("change", updateLessonDownloadButtons);
     $("classForCheck").addEventListener("change", populateDataCheckStudentSelect);
-    $("classSelectCompare").addEventListener("change", populateCompareStudentSelect);
+    $("classSelectCompare").addEventListener("change", () => { if($("useClassObservationPeriods").checked&&$("classSelectCompare").value)applyClassObservationPeriod(); populateCompareStudentSelect(); });
+    $("useClassObservationPeriods").addEventListener("change", () => { if($("useClassObservationPeriods").checked&&$("classSelectCompare").value)applyClassObservationPeriod(); updateBeforeAfterButtons(); });
     $("studentCompareSelect").addEventListener("change", updateBeforeAfterButtons);
     const resetTreePanel = () => {
       clearTreeImage("real");
