@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>카페인·수면 전처리 헬퍼 v75</title>
+  <title>카페인·수면 전처리 헬퍼 v76</title>
   <script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
   <style>
@@ -372,6 +372,15 @@
     input[type="checkbox"] { width: 16px; height: 16px; min-height: 0; padding: 0; margin: 0; flex: 0 0 16px; }
     .checkbox-choice, .example-zip-choice { display: inline-flex; align-items: center; gap: 6px; min-height: 40px; }
     .lesson3-graphs{display:grid;gap:14px;margin-top:16px}.lesson3-graphs figure{margin:0;border:1px solid var(--line);border-radius:8px;background:#fff;padding:10px}.lesson3-graphs svg{width:100%;height:auto;display:block}.lesson3-graphs figcaption{padding-top:8px}.lesson3-answers{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-top:18px}.lesson3-answers section{border:1px solid var(--line);border-radius:8px;background:#fff;padding:14px}.lesson3-answers h3{font-size:15px;color:var(--brand);margin:0 0 8px}.lesson3-answers p,#lesson3ExamplePanel>p{font-size:14px;line-height:1.65}.lesson3-reference{background:#fffaeb;border:1px solid #fedf89;padding:12px;border-radius:8px}@media(max-width:700px){.lesson3-answers{grid-template-columns:1fr}}
+    #lesson6ExamplePanel { padding:18px; }
+    .lesson6-example section { margin:20px 0; }
+    .lesson6-example figure { margin:12px 0; padding:10px; max-width:800px; border:1px solid var(--line); border-radius:8px; background:white; }
+    .lesson6-example svg { display:block; width:100%; height:auto; }
+    .lesson6-example figcaption { padding-top:8px; }
+    .lesson6-example .lesson6-table-wrap { overflow-x:auto; margin:14px 0; }
+    .lesson6-example table { min-width:630px; }
+    .lesson6-example caption { text-align:left; padding:6px 0; font-weight:700; }
+    .lesson6-example th[scope="row"] { text-align:left; }
     .tree-viewer-dialog { box-sizing:border-box; width:min(96vw,1800px); max-width:96vw; height:92vh; height:min(92dvh,1000px); max-height:96vh; border:0; border-radius:12px; padding:0; color:#172033; box-shadow:0 12px 60px #0006; }
     .tree-viewer-dialog[open] { display:flex; flex-direction:column; }
     .tree-viewer-dialog::backdrop { background:rgba(15,23,42,.65); }
@@ -399,9 +408,9 @@
 </head>
 <body>
   <header>
-    <h1>교사용 카페인·수면 분석자료 생성기 v75</h1>
+    <h1>교사용 카페인·수면 분석자료 생성기 v76</h1>
     <p>교사가 카페인·수면 원자료를 넣으면, 학생 활동에 사용할 반별·개인별 분석 데이터와 AI 분석용 CSV를 자동 생성합니다.</p>
-    <p id="publication-update">최근 반영: <time datetime="2026-11-06T07:04:19Z">2026-11-06 16:04:19 한국시간</time>. 6차시 전후비교에 반별 관찰 기간 자동 입력과 개인용 엑셀 요약·그래프 시트를 반영했습니다. 이전 화면이면 파일 선택 전에 Ctrl+F5로 새로고침하세요.</p>
+    <p id="publication-update">최근 반영: <time datetime="2026-11-06T08:36:30Z">2026-11-06 17:36:30 한국시간</time>. 6차시 모범 그래프와 교사용 반 요약을 추가했습니다. 개인·반 모범 그래프의 세로축 눈금은 2 간격입니다. 이전 화면이면 파일 선택 전에 Ctrl+F5로 새로고침하세요.</p>
   </header>
 
   <main>
@@ -551,10 +560,13 @@
               <button id="downloadBeforeAfter" class="secondary" disabled>📥 6차시용 전후 비교 자료 (반)</button>
               <button id="downloadBeforeAfterZip" class="secondary" disabled>📥 개인별 전후 비교 자료 ZIP</button>
               <label class="example-zip-choice"><input id="includeExampleCompare" type="checkbox">개인별 ZIP에 수업용 예시 포함</label>
+              <button type="button" id="showLesson6Examples" class="secondary" aria-controls="lesson6ExamplePanel" aria-expanded="false" disabled>📊 6차시 모범 그래프 보기</button>
+              <label class="checkbox-choice"><input id="hideLesson6ExampleIdentity" type="checkbox" checked>화면 시범 모드(이름 가리기)</label>
             </div>
           </div>
         </div>
 
+        <div id="lesson6ExamplePanel" class="lesson6-example" style="display:none"></div>
         <div class="progress-bar-wrap" id="progressWrap">
           <div class="progress-bar" id="progressBar"></div>
         </div>
@@ -2781,6 +2793,8 @@ function researchCaffeineSheets(source, period) {
         const label = id === "classSelectTree" ? "전체" : ((id === "classForStudent" || id === "classForCheck") ? "전체 학생" : "반 선택");
         const options = id === "classSelect" ? lesson3AvailableClasses() : id === "classForCheck"
           ? [...new Set(dataCheckStudentOptions("", false).map(row => String(row.반)))].filter(Boolean).sort()
+          : id === "classSelectCompare"
+          ? [...new Set([...beforeAfterRosterClasses(state).values()].map(beforeAfterClassKey))].filter(Boolean).sort()
           : classes;
         sel.innerHTML = '<option value="">' + label + ' (' + options.length + '개 반)</option>';
         if (id === "classSelect") { const allOption = document.createElement("option"); allOption.value = LESSON3_ALL; allOption.textContent = "전체(1~4반)"; sel.appendChild(allOption); }
@@ -2877,8 +2891,13 @@ function researchCaffeineSheets(source, period) {
     }
 
     function compareStudentOptions() {
-      const klass = $("classSelectCompare")?.value || "";
-      return studentOptionsForClass(klass);
+      const real=beforeAfterRosterClasses(state),example=beforeAfterRosterClasses(state?.classroom);
+      const groups=groupRowsByStudent(rowsForBeforeAfterSelection($("classSelectCompare")?.value,true));
+      return [...groups.values()].map(([row])=>{
+        const roster=row._classroomExample?example:real;
+        const {익명ID,번호,_classroomExample,이름,_학번}=row;
+        return {익명ID,반:beforeAfterClassKey(roster.get(idText(_학번))),번호,_classroomExample,이름,학번:_학번||""};
+      }).sort((a,b)=>String(a.반).localeCompare(String(b.반))||Number(a.번호||0)-Number(b.번호||0));
     }
 
     function populateCompareStudentSelect() {
@@ -2904,6 +2923,7 @@ function researchCaffeineSheets(source, period) {
       if ($("downloadBeforeAfter")) $("downloadBeforeAfter").disabled = !state || !hasPeriod || !rowsForBeforeAfterSelection().length || !!state.identityWarnings?.length;
       if ($("downloadBeforeAfterZip")) $("downloadBeforeAfterZip").disabled = !state || !hasPeriod || !hasRows;
       if ($("downloadBeforeAfterOne")) $("downloadBeforeAfterOne").disabled = !state || !hasPeriod || !$("studentCompareSelect")?.value;
+      if ($("showLesson6Examples")) $("showLesson6Examples").disabled = !state || !hasPeriod;
     }
 
     function updateDataCheckButtons() {
@@ -3903,6 +3923,7 @@ function researchCaffeineSheets(source, period) {
       clearTreeImage("real");
       processingRevision += 1;
       clearLesson3Examples();
+      clearLesson6Examples();
       lessonExportBusy.classes = false;
       lessonExportBusy.students = false;
       if ($("progressWrap")) $("progressWrap").style.display = "none";
@@ -3911,7 +3932,7 @@ function researchCaffeineSheets(source, period) {
       activeTab = "teacherAnalysis";
       ["showLesson3Examples", "downloadTeacher", "downloadCsv", "downloadStudentRuleCsv", "downloadAiSummary", "treeDraw", "downloadByClass", "downloadAllClass",
         "downloadOneStudent", "downloadAllStudents", "downloadTask", "downloadBeforeAfter", "downloadBeforeAfterOne",
-        "downloadBeforeAfterZip", "downloadDataCheck", "downloadDataCheckZip", "downloadReview"].forEach(id => {
+        "downloadBeforeAfterZip", "showLesson6Examples", "downloadDataCheck", "downloadDataCheckZip", "downloadReview"].forEach(id => {
         if ($(id)) $(id).disabled = true;
       });
       ["metrics", "tabs"].forEach(id => { if ($(id)) $(id).innerHTML = ""; });
@@ -4730,6 +4751,7 @@ function researchCaffeineSheets(source, period) {
       const klass=String($("classSelectCompare")?.value||"").replace(/^2[- ]/,"");
       const selected=CLASS_COMPARE_PERIODS[klass];if(!selected){alert("반을 선택해주세요.");return;}
       ["beforeExperimentStart","beforeExperimentEnd","experimentStart","experimentEnd"].forEach((id,i)=>$(id).value=selected[i]);
+      clearLesson6Examples();
       updateBeforeAfterButtons();
     }
 
@@ -4756,15 +4778,23 @@ function researchCaffeineSheets(source, period) {
       return { preStart, preEnd, start, end, preDays: Math.round((preEnd-preStart)/86400000)+1, endDays: Math.round((end-start)/86400000)+1 };
     }
 
-    function rowsForBeforeAfterSelection() {
-      const klass = $("classSelectCompare")?.value || "";
-      const options = compareStudentOptions();
-      const allowedStudents = new Set(options.map(s => s.익명ID));
-      return (state?.analysis || []).filter(row => {
-        if (klass && String(row.반) !== String(klass)) return false;
-        if (allowedStudents.size && !allowedStudents.has(row.익명ID)) return false;
-        return true;
-      });
+    function beforeAfterClassKey(klass) {
+      return String(klass??"").trim().replace(/^2[- ]/,"");
+    }
+
+    function beforeAfterRosterClasses(source) {
+      return new Map((source?.rawStudents||[]).map(row=>[
+        idText(identityValue(row,["전체학번","학번","학생ID","id"])),value(row,["반"])
+      ]).filter(([id])=>id));
+    }
+
+    function rowsForBeforeAfterSelection(klass = $("classSelectCompare")?.value, includeExample = false) {
+      const rows=individualRows("",includeExample);
+      if(!klass)return rows;
+      const roster=beforeAfterRosterClasses(state);
+      const selected=beforeAfterClassKey(klass);
+      // Select students by roster class, then keep every row for those students.
+      return rows.filter(row=>row._classroomExample||beforeAfterClassKey(roster.get(idText(row._학번)))===selected);
     }
 
     function groupRowsByStudent(rows) {
@@ -4902,24 +4932,72 @@ function researchCaffeineSheets(source, period) {
         return summary;
     }
 
+    function beforeAfterStudentSummary(summary) {
+      return beforeAfterMetricRows(summary,true).map(row =>
+        row.결과 === '기록이 적어 비교 어려워요' ? {...row,변화:null} : row
+      );
+    }
+
+    function beforeAfterClassOverview(summary) {
+      const labels=beforeAfterMetricRows({}).map(row=>row.항목);
+      const headers=['학번','이름','수면 앞 기록일','수면 뒤 기록일',
+        ...labels.flatMap(label=>['앞','뒤','결과'].map(part=>label+' '+part))];
+      const students=[...summary].sort((a,b)=>Number(a.번호)-Number(b.번호)||String(a.반).localeCompare(String(b.반)));
+      const rows=students.map(student=>{
+        const metrics=beforeAfterMetricRows(student,true);
+        return [student.전체학번,student.성명,metrics[0]['앞 기록일수'],metrics[0]['뒤 기록일수'],
+          ...metrics.flatMap(row=>[row['앞 기간'],row['뒤 기간'],row.결과])];
+      });
+      const ws=XLSX.utils.aoa_to_sheet([headers,...rows]);
+      ws['!cols']=[12,16,14,14,...labels.flatMap(()=>[18,18,28])].map(wch=>({wch}));
+      ws['!rows']=[{hpt:42}];
+      ws['!freeze']={xSplit:2,ySplit:1,topLeftCell:'C2'};
+      for(const [address,cell] of Object.entries(ws)){
+        if(address.startsWith('!'))continue;
+        const {r,c}=XLSX.utils.decode_cell(address);
+        if(r===0)cell.s={font:{bold:true},alignment:{wrapText:true,vertical:'center'}};
+        else if(c>=4&&cell.t==='n'){cell.z=c<10?'0.0':'0';delete cell.w;}
+      }
+      return ws;
+    }
+
+    function beforeAfterClassGuide(summary) {
+      const periods=new Map(summary.map(row=>[String(row.반),row]));
+      return [
+        '6차시 전후 비교 자료 — 교사용 반 파일입니다. 학생에게 배부하지 않습니다.',
+        '[반_한눈에] 학생 개인 파일과 같은 표시값과 결과를 번호 순으로 확인합니다.',
+        '[그래프용] 학생별 수면시간·컨디션의 앞·뒤 값을 확인합니다.',
+        '[상세_전후비교] 집계값, 유효 기록일수, 학생별 적용 기간 및 취침 전 24시간 참고 열입니다.',
+        '[기간별_원자료] 앞·뒤 기간에 포함된 행입니다. [처리요약]은 전처리 결과와 기준을 담습니다.',
+        ...[...periods.keys()].sort().map(klass=>{
+          const row=periods.get(klass);
+          return (klass?klass+'반':'반 미상')+' — 앞 기간 '+row.초기시작일+' ~ '+row.초기종료일+
+            ' · 뒤 기간 '+row.종료시작일+' ~ '+row.종료종료일;
+        }),
+        '앞 또는 뒤 유효 기록일이 2일 미만이면 기록이 적어 비교 어려워요.',
+        '변화의 절댓값이 수면 0.25시간, 컨디션 0.2점, 카페인 10mg, 비율 10%p보다 작으면 비슷해요. 그 밖은 늘었어요 또는 줄었어요.',
+        '카페인은 달력 날짜(0시~24시) 기준입니다. 그날 마신 양을 그날로 셉니다.'
+      ];
+    }
+
     function beforeAfterWorkbook(summary, detailRows, period, individual = false) {
       const wb=XLSX.utils.book_new(),first=summary[0]||{};
       const selected=individual&&first.초기시작일?{preStart:parseDateFlexible(first.초기시작일),preEnd:parseDateFlexible(first.초기종료일),start:parseDateFlexible(first.종료시작일),end:parseDateFlexible(first.종료종료일)}:period;
       const days=(a,b)=>Math.round((b-a)/86400000)+1;
-      const guide=[individual?'6차시 전후 비교 자료 — 본인 자료만 확인합니다.':'6차시 전후 비교 자료 — 교사용 반 파일입니다. 반별 일정 모드는 요약표의 학생별 날짜를 확인합니다.',
+      const guide=individual?['6차시 전후 비교 자료 — 본인 자료만 확인합니다.',
         '앞 기간(목표 세우기 전): '+dateKey(selected.preStart)+' ~ '+dateKey(selected.preEnd)+' ('+days(selected.preStart,selected.preEnd)+'일)',
         '뒤 기간(실천 기간): '+dateKey(selected.start)+' ~ '+dateKey(selected.end)+' ('+days(selected.start,selected.end)+'일)',
         '1. [전후비교_요약] 시트의 5항목을 활동지 표에 옮겨 적습니다.',
-        individual?'2. [그래프용] 시트의 A1:C3을 선택해 묶은 세로 막대그래프를 만듭니다.':'2. [그래프용] 시트에서 해당 학생의 두 항목을 선택해 묶은 세로 막대그래프를 만듭니다.',
+        '2. [그래프용] 시트의 A1:C3을 선택해 묶은 세로 막대그래프를 만듭니다.',
         "두 기간의 길이가 달라서 오후 카페인과 폰 사용은 '기록한 날 중 몇 %'로 비교합니다.",
         '평균은 기록한 날만으로 계산합니다. 기록 안 한 날을 0으로 넣지 않습니다.',
-        ...(!individual?['카페인은 달력 날짜(0시~24시) 기준입니다. 그날 마신 양을 그날로 셉니다.']:[]),
         '수면시간은 취침~기상 시각 사이의 시간이에요.',
-        '함께 변했다고 해서 원인이라고 단정할 수는 없어요.'];
+        '함께 변했다고 해서 원인이라고 단정할 수는 없어요.']:beforeAfterClassGuide(summary);
+      if(!individual)XLSX.utils.book_append_sheet(wb,beforeAfterClassOverview(summary),'반_한눈에');
       appendSleepFormattedSheet(wb,XLSX.utils.json_to_sheet(oneColumnSheet(guide)),'활동안내');
-      const vertical=individual?beforeAfterMetricRows(first,true):summary;
-      const ws=XLSX.utils.json_to_sheet(vertical);appendSleepFormattedSheet(wb,ws,'전후비교_요약');
       if(individual){
+        const vertical=beforeAfterStudentSummary(first);
+        const ws=XLSX.utils.json_to_sheet(vertical);appendSleepFormattedSheet(wb,ws,'전후비교_요약');
         ws['!cols']=[28,10,10,10,26,12,12].map(wch=>({wch}));ws['!freeze']={ySplit:1,topLeftCell:'A2'};
         ws['!rows']=[{hpt:32},...vertical.map(()=>({hpt:44}))];
         for(const [address,cell]of Object.entries(ws)){if(address.startsWith('!'))continue;const p=XLSX.utils.decode_cell(address);cell.s={font:{sz:11,...(p.r===0?{bold:true}:{})},alignment:{wrapText:true,vertical:'center'}};if(p.r>0&&p.c>=1&&p.c<=3&&cell.t==='n'){cell.z=p.r<=2?'0.0':'0';delete cell.w;}}
@@ -4928,7 +5006,18 @@ function researchCaffeineSheets(source, period) {
       appendSleepFormattedSheet(wb,XLSX.utils.json_to_sheet(chartRows,{header:individual?['항목','앞 기간','뒤 기간']:['학생','항목','앞 기간','뒤 기간']}),'그래프용');
       if(individual)for(const address of ['B2','C2','B3','C3']){const cell=wb.Sheets.그래프용[address];if(cell?.t==='n'){cell.z='0.0';delete cell.w;}}
       wb.Sheets.그래프용['!cols']=(individual?[28,12,12]:[24,28,12,12]).map(wch=>({wch}));
-      if(!individual)appendSleepFormattedSheet(wb,XLSX.utils.json_to_sheet(detailRows||[]),'기간별_원자료');
+      if(!individual){
+        const detail=XLSX.utils.json_to_sheet(summary);
+        appendSleepFormattedSheet(wb,detail,'상세_전후비교');
+        const range=XLSX.utils.decode_range(detail['!ref']);
+        for(let c=0;c<=range.e.c;c++){
+          const header=detail[XLSX.utils.encode_cell({r:0,c})];
+          if(!header)continue;
+          header.v=header.v.replaceAll('처음 기록','앞 기간').replaceAll('마지막 실천','뒤 기간');
+          delete header.w;
+        }
+        appendSleepFormattedSheet(wb,XLSX.utils.json_to_sheet(detailRows||[]),'기간별_원자료');
+      }
       appendProcessingSummary(wb);
       if(summary.some(row=>row._classroomExample)){
         labelExampleWorkbook(wb);
@@ -4937,6 +5026,10 @@ function researchCaffeineSheets(source, period) {
         wb.Sheets.활동안내.A2.v='수업용 예시 데이터 — '+notice;delete wb.Sheets.활동안내.A2.w;
         delete wb.Sheets['수업용 예시 안내'];wb.SheetNames=wb.SheetNames.filter(n=>n!=='수업용 예시 안내');
       }
+      if(individual){
+        wb.Workbook ??= {};
+        wb.Workbook.Sheets=wb.SheetNames.map(name=>({Hidden:name==='처리요약'?1:0}));
+      }
       wb.Sheets.활동안내['!cols']=[{wch:115}];wb.Sheets.활동안내['!rows']=[{hpt:24},...guide.map(()=>({hpt:42}))];
       if(summary.some(row=>row._classroomExample))wb.Sheets.활동안내['!rows'][1]={hpt:96};
       for(const [address,cell]of Object.entries(wb.Sheets.활동안내))if(!address.startsWith('!'))cell.s={alignment:{wrapText:true,vertical:'center'}};
@@ -4944,10 +5037,16 @@ function researchCaffeineSheets(source, period) {
     }
     async function beforeAfterWorkbookBytes(wb) {
       const bytes=XLSX.write(wb,{bookType:'xlsx',type:'array'});
-      const index=wb.SheetNames.indexOf('전후비교_요약');if(index<0||!wb.Sheets.전후비교_요약['!freeze'])return bytes;
+      const index=wb.SheetNames.findIndex(name=>wb.Sheets[name]['!freeze']);
+      if(index<0)return bytes;
+      const freeze=wb.Sheets[wb.SheetNames[index]]['!freeze'];
       const zip=await JSZip.loadAsync(bytes),path='xl/worksheets/sheet'+(index+1)+'.xml';
       let xml=await zip.file(path).async('string');
-      const views='<sheetViews><sheetView workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/><selection pane="bottomLeft" activeCell="A2" sqref="A2"/></sheetView></sheetViews>';
+      const activePane=freeze.xSplit?'bottomRight':'bottomLeft';
+      const xSplit=freeze.xSplit?`xSplit="${freeze.xSplit}" `:'';
+      const sideSelections=freeze.xSplit?'<selection pane="topRight" activeCell="C1" sqref="C1"/><selection pane="bottomLeft" activeCell="A2" sqref="A2"/>':'';
+      const cell=freeze.topLeftCell;
+      const views=`<sheetViews><sheetView workbookViewId="0"><pane ${xSplit}ySplit="${freeze.ySplit}" topLeftCell="${cell}" activePane="${activePane}" state="frozen"/>${sideSelections}<selection pane="${activePane}" activeCell="${cell}" sqref="${cell}"/></sheetView></sheetViews>`;
       xml=/<sheetViews[\s\S]*?<\/sheetViews>/.test(xml)?xml.replace(/<sheetViews[\s\S]*?<\/sheetViews>/,views):xml.replace('<sheetData>',views+'<sheetData>');
       zip.file(path,xml);return zip.generateAsync({type:'uint8array'});
     }
@@ -4957,9 +5056,12 @@ function researchCaffeineSheets(source, period) {
     }
 
     function buildBeforeAfterEntries(rows, period) {
+      const real=beforeAfterRosterClasses(state),example=beforeAfterRosterClasses(state?.classroom);
       return [...groupRowsByStudent(rows).entries()].map(([sid, studentRows]) => {
-        const info = studentRows[0] || {};
-        const selected=period.byClass?.[String(info.반).replace(/^2[- ]/,"")]||period;
+        const first=studentRows[0];
+        const roster=first._classroomExample?example:real;
+        const info={...first,반:roster.get(idText(first._학번))??""};
+        const selected=period.byClass?.[beforeAfterClassKey(info.반)]||period;
         const before = studentRows.filter(row => inDateRange(row.분석일, selected.preStart, selected.preEnd));
         const during = studentRows.filter(row => inDateRange(row.분석일, selected.start, selected.end));
         const detailRows = before.map(row => ({ 구분: "앞 기간", ...row })).concat(during.map(row => ({ 구분: "뒤 기간", ...row })));
@@ -4987,7 +5089,7 @@ function researchCaffeineSheets(source, period) {
       if (!period) return;
       const sid = $("studentCompareSelect")?.value;
       if (!sid) { alert("전후 비교 자료를 만들 학생을 선택해주세요."); return; }
-      const rows = individualRows().filter(row => row.익명ID === sid);
+      const rows = rowsForBeforeAfterSelection($("classSelectCompare").value,true).filter(row => row.익명ID === sid);
       const entries = buildBeforeAfterEntries(rows, period);
       if (!entries.length) { alert("선택한 학생의 전후 비교 데이터가 없습니다."); return; }
       const entry = entries[0];
@@ -5006,7 +5108,7 @@ function researchCaffeineSheets(source, period) {
 
       const period = getBeforeAfterPeriod();
       if (!period) return;
-      const entries = buildBeforeAfterEntries(individualRows($("classSelectCompare").value, $("includeExampleCompare").checked), period);
+      const entries = buildBeforeAfterEntries(rowsForBeforeAfterSelection($("classSelectCompare").value,$("includeExampleCompare").checked), period);
       if (!entries.length) {
         alert("선택한 조건에 맞는 전후 비교 데이터가 없습니다.");
         return;
@@ -5058,6 +5160,195 @@ function researchCaffeineSheets(source, period) {
     }
 
     
+
+    let lesson6ExampleState = null;
+    const LESSON6_COMPARE_DATES = ["beforeExperimentStart","beforeExperimentEnd","experimentStart","experimentEnd"];
+    const LESSON6_CHART_LABELS = ['평균 수면시간(시간)','평균 컨디션(점)'];
+    const LESSON6_RESULTS = ['늘었어요','비슷해요','줄었어요','기록이 적어 비교 어려워요'];
+
+    function lesson6ExampleSelection() {
+      const fields=["classSelectCompare","studentCompareSelect","analysisStart","analysisEnd","afternoonHour",...LESSON6_COMPARE_DATES];
+      return JSON.stringify([$("useClassObservationPeriods").checked,...fields.map(id=>$(id).value)]);
+    }
+
+    function clearLesson6Examples() {
+      lesson6ExampleState=null;
+      const panel=$("lesson6ExamplePanel");
+      panel.innerHTML="";
+      panel.style.display="none";
+      $("showLesson6Examples").setAttribute("aria-expanded","false");
+    }
+
+    function lesson6GroupedBarSvg(title, groups) {
+      const periods=['앞 기간','뒤 기간'],colors=['#9AA4B2','#3B6FD8'];
+      const top=76,bottom=298,left=70,right=756;
+      const step=2;
+      const dataMaximum=Math.max(...groups.flat());
+      const maximum=Math.max(6,step*Math.ceil(dataMaximum/step));
+      const y=value=>bottom-(bottom-top)*value/maximum;
+      const ticks=[];
+      for(let value=0;value<=maximum;value+=step)ticks.push(value);
+      const grid=ticks.map(value=>`<line x1="${left}" y1="${y(value)}" x2="${right}" y2="${y(value)}" stroke="${value===0?'#98A2B3':'#E4E7EC'}"/><text x="${left-10}" y="${y(value)+4}" text-anchor="end" font-size="12" fill="#475467">${value}</text>`).join('');
+      const legend=periods.map((name,i)=>{
+        const x=572+i*92;
+        return `<rect x="${x}" y="28" width="14" height="14" rx="2" fill="${colors[i]}"/><text x="${x+21}" y="40" font-size="13">${name}</text>`;
+      }).join('');
+      const bars=groups.map((values,i)=>{
+        const center=left+(right-left)*(i*2+1)/4;
+        const pair=values.map((value,j)=>{
+          const x=center+(j===0?-43:43);
+          if(value==='')return `<text x="${x}" y="${bottom-9}" font-size="12" fill="#667085">기록 없음</text>`;
+          const height=bottom-y(value);
+          const label=value.toFixed(1);
+          return `<rect x="${x-30}" y="${y(value)}" width="60" height="${height}" fill="${colors[j]}"/><text x="${x}" y="${y(value)-9}" font-size="15" font-weight="700" data-bar-value="${label}">${label}</text>`;
+        }).join('');
+        return `<g text-anchor="middle">${pair}<text x="${center}" y="${bottom+33}" font-size="16">${LESSON6_CHART_LABELS[i]}</text></g>`;
+      }).join('');
+      return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 380" width="800" height="380" role="img" aria-label="${escapeHtml(title)}" font-family="Segoe UI, Noto Sans KR, Malgun Gothic, sans-serif" fill="#172033"><rect width="800" height="380" fill="white"/><text x="40" y="42" font-size="21" font-weight="700">${escapeHtml(title)}</text>${legend}${grid}${bars}</svg>`;
+    }
+
+    function lesson6ExampleModel(period) {
+      const klass=$("classSelectCompare").value;
+      const sid=$("studentCompareSelect").value;
+      const label=klass?klass+'반':'전체';
+      const students=buildBeforeAfterEntries(rowsForBeforeAfterSelection(),period)
+        .filter(({info})=>klass||Object.hasOwn(CLASS_COMPARE_PERIODS,beforeAfterClassKey(info.반)))
+        .map(({summary})=>({
+          stored:beforeAfterMetricRows(summary),
+          student:beforeAfterMetricRows(summary,true)
+        }));
+      const labels=beforeAfterMetricRows({}).map(row=>row.항목);
+      const averages=labels.map((label,i)=>{
+        const included=students.map(s=>s.stored[i]).filter(row=>row['앞 기록일수']>=2&&row['뒤 기록일수']>=2);
+        const mean=key=>included.length?included.reduce((sum,row)=>sum+row[key],0)/included.length:'';
+        return {label,before:mean('앞 기간'),after:mean('뒤 기간'),count:included.length};
+      });
+      const results=labels.map((label,i)=>{
+        const counts=LESSON6_RESULTS.map(result=>students.filter(s=>s.student[i].결과.split(' (')[0]===result).length);
+        return [label,...counts,students.length];
+      });
+      const selected=sid&&buildBeforeAfterEntries(rowsForBeforeAfterSelection(klass,true).filter(row=>row.익명ID===sid),period)[0];
+      let personal=null;
+      if(selected){
+        const metrics=beforeAfterStudentSummary(selected.summary);
+        personal={
+          identity:[selected.summary.전체학번,selected.summary.성명].filter(Boolean).join(' '),
+          metrics,
+          svg:lesson6GroupedBarSvg('개인 모범 그래프',metrics.slice(0,2).map(row=>[row['앞 기간'],row['뒤 기간']]))
+        };
+      }
+      return {label,total:students.length,averages,results,personal,
+        classSvg:lesson6GroupedBarSvg('반 평균 모범 그래프',averages.slice(0,2).map(row=>[row.before,row.after]))};
+    }
+
+    function lesson6ExampleTable(title, headers, rows) {
+      const head=headers.map(cell=>`<th scope="col">${escapeHtml(cell)}</th>`).join('');
+      const body=rows.map(([label,...cells])=>`<tr><th scope="row">${escapeHtml(label)}</th>${cells.map(cell=>`<td>${escapeHtml(cell)}</td>`).join('')}</tr>`).join('');
+      return `<div class="lesson6-table-wrap"><table><caption>${title}</caption><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table></div>`;
+    }
+
+    function lesson6ExampleBody(model, hideName, interactive=false) {
+      const {label,total,averages,results,personal,classSvg}=model;
+      const number=(value,precision)=>typeof value==='number'?value.toFixed(precision):'';
+      const png=(kind,label)=>interactive?`<figcaption><button type="button" class="secondary" onclick="downloadLesson6Chart('${kind}')" aria-label="${label} PNG 저장">PNG 저장</button></figcaption>`:'';
+      let personalBody='<p>학생을 선택하면 그 학생이 만들 그래프의 예시를 보여 줍니다.</p>';
+      if(personal){
+        const heading=hideName?'선택한 학생':personal.identity||'선택한 학생';
+        const rows=personal.metrics.map((row,i)=>[row.항목,...['앞 기간','뒤 기간','변화'].map(key=>number(row[key],i<2?1:0)),
+          row.결과,row['앞 기록일수'],row['뒤 기록일수']]);
+        personalBody=`<p>${escapeHtml(heading)}</p><figure>${personal.svg}${png('personal','개인 모범 그래프')}</figure>`+
+          lesson6ExampleTable('개인 전후비교 요약',['항목','앞 기간','뒤 기간','변화','결과','앞 기록일수','뒤 기록일수'],rows);
+      }
+      const coverage=averages.slice(0,2).map((row,i)=>`<li>${LESSON6_CHART_LABELS[i]} · 포함 ${row.count}명 / 전체 ${total}명</li>`).join('');
+      const averageRows=averages.map((row,i)=>[row.label,number(row.before,i<2?1:0),number(row.after,i<2?1:0),row.count+'명']);
+      const sleep=averages[0];
+      // Each included student already has at least two valid days per period.
+      const interpretation=sleep.count
+        ? `반 평균 수면시간은 앞 기간 ${number(sleep.before,1)}시간, 뒤 기간 ${number(sleep.after,1)}시간으로 ${beforeAfterResult(sleep.before,sleep.after,2,2,.25,'시간',1)}. (포함 ${sleep.count}명)`
+        : '앞·뒤 기록이 각각 2일 이상인 학생이 없어 반 평균을 비교하지 않았어요.';
+      const scope=label==='전체'?'전체 1~4반':label;
+      return `<h2>6차시 모범 그래프</h2><p class="lesson3-reference">교사용 참고 예시이며 유일한 정답이 아닙니다. 학생은 먼저 직접 그래프를 만든 뒤 비교합니다.</p>
+        ${interactive?'<button type="button" class="secondary" onclick="downloadLesson6ExampleHtml()">교사용 HTML 저장</button>':''}
+        <section data-lesson6-example="personal"><h3>개인 모범</h3>${personalBody}</section>
+        <section data-lesson6-example="class"><h3>반 모범 · ${escapeHtml(scope)}</h3>
+          <figure>${classSvg}${png('class','반 평균 모범 그래프')}</figure><ul>${coverage}</ul>
+          ${lesson6ExampleTable('결과별 학생 수',['항목',...LESSON6_RESULTS,'합계'],results)}
+          ${lesson6ExampleTable('반 평균 5항목',['항목','앞 기간','뒤 기간','포함 학생 수'],averageRows)}
+          <p>${escapeHtml(interpretation)}</p><p>함께 변했다고 해서 목표 행동이 원인이라고 단정할 수는 없어요. 시험·행사처럼 그 기간에 달라진 일도 함께 생각해 봅니다.</p>
+        </section>`;
+    }
+
+    function currentLesson6Example() {
+      const example=lesson6ExampleState;
+      if(!example||!state||example.revision!==processingRevision||example.selection!==lesson6ExampleSelection()){
+        clearLesson6Examples();
+        return null;
+      }
+      return example;
+    }
+
+    function renderLesson6Example() {
+      const example=currentLesson6Example();
+      if(!example)return;
+      const panel=$("lesson6ExamplePanel");
+      panel.innerHTML=lesson6ExampleBody(example.model,$("hideLesson6ExampleIdentity").checked,true);
+      panel.style.display="block";
+      $("showLesson6Examples").setAttribute("aria-expanded","true");
+    }
+
+    function drawLesson6Examples() {
+      clearLesson6Examples();
+      if(!requireResolvedIdentity())return;
+      const period=getBeforeAfterPeriod();
+      if(!period)return;
+      lesson6ExampleState={revision:processingRevision,selection:lesson6ExampleSelection(),model:lesson6ExampleModel(period)};
+      renderLesson6Example();
+    }
+
+    function downloadLesson6ExampleHtml() {
+      const example=currentLesson6Example();
+      if(!example)return;
+      const {model}=example;
+      const body=lesson6ExampleBody(model,$("hideLesson6ExampleIdentity").checked);
+      const html=`<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>6차시 교사용 모범 그래프 · ${escapeHtml(model.label)}</title>
+        <style>body{font-family:Segoe UI,Noto Sans KR,Malgun Gothic,sans-serif;color:#172033;max-width:980px;margin:24px auto;padding:0 16px;line-height:1.6}
+        section{margin:24px 0}figure{margin:12px 0;padding:10px;max-width:800px;border:1px solid #d8dee9;border-radius:8px;background:white}
+        svg{display:block;width:100%;height:auto}.lesson3-reference{background:#fffaeb;border:1px solid #fedf89;border-radius:8px;padding:12px}
+        .lesson6-table-wrap{overflow-x:auto;margin:14px 0}table{width:100%;min-width:630px;border-collapse:collapse;font-size:14px}
+        caption{text-align:left;padding:6px 0;font-weight:700}th,td{padding:7px;border:1px solid #d8dee9;text-align:center}thead{background:#f5f7fb}th[scope=row]{text-align:left}
+        @media print{body{margin:0;max-width:none;padding:0;font-size:10pt}figure,table{break-inside:avoid}table{min-width:0}svg{max-height:88mm}h2,h3{break-after:avoid}}</style>
+        </head><body>${body}</body></html>`;
+      saveLesson3Blob(new Blob([html],{type:"text/html;charset=utf-8"}),`6차시_${safeFileName(model.label)}_교사용_모범그래프.html`);
+    }
+
+    async function downloadLesson6Chart(kind) {
+      const example=currentLesson6Example();
+      if(!example)return;
+      const {model}=example;
+      const isPersonal=kind==='personal';
+      const svg=isPersonal?model.personal?.svg:model.classSvg;
+      if(!svg)return;
+      const name=isPersonal?'6차시_개인예시_막대.png':`6차시_${safeFileName(model.label)}_반평균_막대.png`;
+      const url=URL.createObjectURL(new Blob([svg],{type:"image/svg+xml;charset=utf-8"}));
+      try {
+        const img=new Image();
+        await new Promise((resolve,reject)=>{
+          img.onload=resolve;
+          img.onerror=()=>reject(new Error("그래프 이미지 변환 실패"));
+          img.src=url;
+        });
+        if(currentLesson6Example()!==example)return;
+        const canvas=document.createElement("canvas");
+        canvas.width=1600;canvas.height=760;
+        canvas.getContext("2d").drawImage(img,0,0,canvas.width,canvas.height);
+        const blob=await new Promise(resolve=>canvas.toBlob(resolve,"image/png"));
+        if(blob&&currentLesson6Example()===example)saveLesson3Blob(blob,name);
+      } catch(error) {
+        if(currentLesson6Example()===example)alert(error.message);
+      } finally {
+        URL.revokeObjectURL(url);
+      }
+    }
 
     function setSelectedWorkbookFile(file) {
       if (!file) return;
@@ -5209,9 +5500,14 @@ function researchCaffeineSheets(source, period) {
     $("studentSelect").addEventListener("change", updateLessonDownloadButtons);
     $("includeExampleStudent").addEventListener("change", updateLessonDownloadButtons);
     $("classForCheck").addEventListener("change", populateDataCheckStudentSelect);
-    $("classSelectCompare").addEventListener("change", () => { if($("useClassObservationPeriods").checked&&$("classSelectCompare").value)applyClassObservationPeriod(); populateCompareStudentSelect(); });
-    $("useClassObservationPeriods").addEventListener("change", () => { if($("useClassObservationPeriods").checked&&$("classSelectCompare").value)applyClassObservationPeriod(); updateBeforeAfterButtons(); });
-    $("studentCompareSelect").addEventListener("change", updateBeforeAfterButtons);
+    $("classSelectCompare").addEventListener("change", () => { clearLesson6Examples(); if($("useClassObservationPeriods").checked&&$("classSelectCompare").value)applyClassObservationPeriod(); populateCompareStudentSelect(); });
+    $("useClassObservationPeriods").addEventListener("change", () => { clearLesson6Examples(); if($("useClassObservationPeriods").checked&&$("classSelectCompare").value)applyClassObservationPeriod(); updateBeforeAfterButtons(); });
+    $("studentCompareSelect").addEventListener("change", () => { clearLesson6Examples(); updateBeforeAfterButtons(); });
+    $("showLesson6Examples").addEventListener("click",drawLesson6Examples);
+    $("hideLesson6ExampleIdentity").addEventListener("change",renderLesson6Example);
+    ["analysisStart","analysisEnd","afternoonHour"].forEach(id=>{
+      ["input","change"].forEach(event=>$(id).addEventListener(event,clearLesson6Examples));
+    });
     const resetTreePanel = () => {
       clearTreeImage("real");
       if ($("treePanel")) {
@@ -5223,8 +5519,11 @@ function researchCaffeineSheets(source, period) {
     $("studentCheckSelect").addEventListener("change", updateDataCheckButtons);
     $("dataCheckStart").addEventListener("change", updateDataCheckButtons);
     $("dataCheckEnd").addEventListener("change", updateDataCheckButtons);
-    ["beforeExperimentStart", "beforeExperimentEnd", "experimentStart", "experimentEnd"].forEach(id => {
-      $(id).addEventListener("change", updateBeforeAfterButtons);
+    LESSON6_COMPARE_DATES.forEach(id => {
+      ["input","change"].forEach(event=>$(id).addEventListener(event,()=>{
+        clearLesson6Examples();
+        updateBeforeAfterButtons();
+      }));
     });
     ["includeExampleCheck", "includeExampleStudent", "includeExampleCompare"].forEach(id => $(id).addEventListener("change", () => { updateDataCheckButtons(); updateBeforeAfterButtons(); }));
     setupFileDropZone();
