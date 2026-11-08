@@ -423,7 +423,7 @@
   <header>
     <h1>교사용 카페인·수면 분석자료 생성기 v79</h1>
     <p>교사가 카페인·수면 원자료를 넣으면, 학생 활동에 사용할 반별·개인별 분석 데이터와 AI 분석용 CSV를 자동 생성합니다.</p>
-    <p id="publication-update">최근 반영: <time datetime="2026-11-08T06:28:04Z">2026-11-08 15:28:04 한국시간</time>. 6차시 개인별 ZIP 저장 버튼과 반별 자료 추가 체크란을 같은 상자에 모았습니다. 이전 화면이면 파일 선택 전에 Ctrl+F5로 새로고침하세요.</p>
+    <p id="publication-update">최근 반영: <time datetime="2026-11-08T09:46:09Z">2026-11-08 18:46:09 한국시간</time>. 6차시 그래프는 생활습관부터 보여 주고 하루 평균 카페인 그래프를 먼저 엽니다. 이전 화면이면 파일 선택 전에 Ctrl+F5로 새로고침하세요.</p>
   </header>
 
   <main>
@@ -5596,7 +5596,7 @@ function researchCaffeineSheets(source, period) {
       }finally{URL.revokeObjectURL(url);}
     }
 
-    function lesson6MotionRuntime(root,view,initial=0,initialReplay=true) {
+    function lesson6MotionRuntime(root,view,initial=6,initialReplay=true) {
       const {personal,classChart,results,student,classStudent}=view;
       const charts={...(personal?{personal}:{}),...(classChart?{classChart}:{})};
       const metrics=(personal||classChart).metrics;
@@ -5621,7 +5621,7 @@ function researchCaffeineSheets(source, period) {
         .lesson6-motion caption{text-align:left;font-weight:700;margin-bottom:5px}.lesson6-motion footer{margin-top:24px}
         .lesson6-motion section{margin:20px 0}.lesson6-motion .lesson3-reference{padding:10px;background:#fffaeb}
         .lesson6-status{font-size:13px;color:#344054}.lesson6-readout{max-width:800px}
-      </style>${intro}${controls('수면',0,6)}${controls('생활습관',6,10)}
+      </style>${intro}${controls('생활습관',6,10)}${controls('수면·컨디션',0,6)}
         <div class="lesson6-actions"><button type="button" data-replay>▶ 다시 보기</button></div>
         <div data-motion-charts></div>${tables}${studentGuide}`;
       const area=root.querySelector('[data-motion-charts]');
@@ -5710,7 +5710,7 @@ function researchCaffeineSheets(source, period) {
       if(!example)return;
       const panel=$("lesson6ExamplePanel");
       const previous=panel.querySelector('.lesson6-motion');
-      const initial=Number(previous?.dataset.metric||0);
+      const initial=previous ? Number(previous.dataset.metric) : undefined;
       panel.innerHTML='<button type="button" class="secondary" onclick="downloadLesson6ExampleHtml()">교사용 HTML 저장</button><div class="lesson6-motion"></div>';
       lesson6MotionRuntime(panel.querySelector('.lesson6-motion'),lesson6TeacherView(example.model,$("hideLesson6ExampleIdentity").checked),initial,!previous);
       panel.style.display="block";
