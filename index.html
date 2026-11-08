@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>카페인·수면 전처리 헬퍼 v77</title>
+  <title>카페인·수면 전처리 헬퍼 v78</title>
   <script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
   <style>
@@ -408,9 +408,9 @@
 </head>
 <body>
   <header>
-    <h1>교사용 카페인·수면 분석자료 생성기 v77</h1>
+    <h1>교사용 카페인·수면 분석자료 생성기 v78</h1>
     <p>교사가 카페인·수면 원자료를 넣으면, 학생 활동에 사용할 반별·개인별 분석 데이터와 AI 분석용 CSV를 자동 생성합니다.</p>
-    <p id="publication-update">최근 반영: <time datetime="2026-11-06T09:33:07Z">2026-11-06 18:33:07 한국시간</time>. 6차시 모범 그래프에서 10개 항목을 전환하고 움직임을 다시 볼 수 있습니다. 교사용·학생용 그래프 HTML과 PNG를 저장할 수 있습니다. 이전 화면이면 파일 선택 전에 Ctrl+F5로 새로고침하세요.</p>
+    <p id="publication-update">최근 반영: <time datetime="2026-11-08T05:13:07Z">2026-11-08 14:13:07 한국시간</time>. 6차시 그래프에 카페인 기준선과 기록일수를 표시합니다. 개인 HTML에는 날짜별 기록표가, 반 ZIP에는 익명 학생 배부용 HTML이 들어 있습니다. 이전 화면이면 파일 선택 전에 Ctrl+F5로 새로고침하세요.</p>
   </header>
 
   <main>
@@ -558,7 +558,7 @@
               <select id="studentCompareSelect"><option value="">학생 선택</option></select>
               <button id="downloadBeforeAfterOne" class="secondary" disabled>📥 6차시용 개인 전후 비교 자료</button>
               <button type="button" id="downloadLesson6StudentHtml" class="secondary" disabled>📈 개인 그래프 HTML</button>
-              <button id="downloadBeforeAfter" class="secondary" disabled>📥 6차시용 전후 비교 자료 (반)</button>
+              <button id="downloadBeforeAfter" class="secondary" disabled>📥 6차시용 전후 비교 자료 (반) ZIP</button>
               <button id="downloadBeforeAfterZip" class="secondary" disabled>📥 개인별 전후 비교 자료 ZIP</button>
               <label class="checkbox-choice"><input id="includeLesson6Html" type="checkbox" checked>개인 그래프(HTML) 함께 넣기</label>
               <label class="example-zip-choice"><input id="includeExampleCompare" type="checkbox">개인별 ZIP에 수업용 예시 포함</label>
@@ -5074,6 +5074,10 @@ function researchCaffeineSheets(source, period) {
 
     async function downloadBeforeAfter() {
       if (!requireResolvedIdentity()) return;
+      if (typeof JSZip === "undefined") {
+        alert("압축 라이브러리를 불러오지 못했습니다. 인터넷 연결을 확인한 뒤 다시 시도해주세요.");
+        return;
+      }
       const period = getBeforeAfterPeriod();
       if (!period) return;
       const rows = rowsForBeforeAfterSelection();
@@ -5082,9 +5086,27 @@ function researchCaffeineSheets(source, period) {
       const summary = entries.map(entry => entry.summary);
       const detailRows = entries.flatMap(entry => entry.detailRows);
       const wb = beforeAfterWorkbook(summary, detailRows, period, false, entries.map(lesson6DetailSummary));
-      const klass = $("classSelectCompare").value;
-      const suffix = klass ? `${klass}반` : "전체";
-      await writeBeforeAfterWorkbook(wb, `6차시_전후비교자료_${suffix}.xlsx`);
+      const revision=processingRevision;
+      const button=$("downloadBeforeAfter");
+      button.disabled=true;
+      try{
+        const model=lesson6ExampleModel(period,entries);
+        const suffix=safeFileName(model.label);
+        const studentHtml=lesson6StandaloneHtml(lesson6ClassStudentView(model));
+        const teacherHtml=lesson6StandaloneHtml(lesson6TeacherView(model,true));
+        const bytes=await beforeAfterWorkbookBytes(wb);
+        if(revision!==processingRevision)return;
+        const zip=new JSZip();
+        zip.file(`6차시_전후비교자료_${suffix}_교사용.xlsx`,bytes);
+        zip.file(`6차시_${suffix}_우리반그래프_학생배부용.html`,studentHtml);
+        zip.file(`6차시_${suffix}_교사용_모범그래프.html`,teacherHtml);
+        const blob=await zip.generateAsync({type:'blob'});
+        if(revision===processingRevision)saveLesson3Blob(blob,`6차시_전후비교자료_${suffix}_${dateKey(new Date())}.zip`);
+      }catch(error){
+        if(revision===processingRevision)alert("6차시 반 ZIP 생성 중 오류: "+error.message);
+      }finally{
+        if(revision===processingRevision)updateBeforeAfterButtons();
+      }
     }
 
     async function downloadBeforeAfterOne() {
@@ -5124,6 +5146,10 @@ function researchCaffeineSheets(source, period) {
       const entries = buildBeforeAfterEntries(rowsForBeforeAfterSelection(klass,$("includeExampleCompare").checked), period);
       if (!entries.length) {
         alert("선택한 조건에 맞는 전후 비교 데이터가 없습니다.");
+        return;
+      }
+      if(includeHtml&&entries.some(entry=>!lesson6UnambiguousStudent(entry))){
+        alert("학생 식별이 겹치는 기록이 있어 개인 그래프 HTML을 만들 수 없습니다.");
         return;
       }
 
@@ -5191,17 +5217,26 @@ function researchCaffeineSheets(source, period) {
       {name:'신체활동',label:'신체활동 30분 이상 한 날(%)',field:'신체활동_점수',cut:3}
     ];
 
+    function lesson6BedtimeRecords(rows,index) {
+      return studentRuleOutputRows({
+        rows:rows.map(row=>({분석일:row.분석일,...studentRuleSleepFields(row,index)})),basis:{}
+      }).filter(row=>['예','아니오'].includes(row.자정이후취침));
+    }
+
+    function lesson6ScoreHit(value,cut) {
+      const score=Number(value);
+      return [1,2,3,4].includes(score)?score>=cut:null;
+    }
+
     function lesson6ExtraMetrics(before,during,studentRows=[...before,...during]) {
       const index=studentRuleSleepIndex(studentRows.filter(row=>row.주수면분석상태==='사용'));
       const periods=[before,during];
-      const bedtime=periods.map(rows=>studentRuleOutputRows({
-        rows:rows.map(row=>studentRuleSleepFields(row,index)),basis:{}
-      }).filter(row=>['예','아니오'].includes(row.자정이후취침)));
+      const bedtime=periods.map(rows=>lesson6BedtimeRecords(rows,index));
       const mean=rows=>rows.length?rows.reduce((sum,row)=>sum+row.취침시각_분석일0시기준_h,0)/rows.length:null;
       return LESSON6_EXTRA_ITEMS.map(({name,label,field,cut})=>{
         const counts=field?periods.map(rows=>{
-          const valid=rows.map(row=>Number(row[field])).filter(score=>[1,2,3,4].includes(score));
-          return [valid.filter(score=>score>=cut).length,valid.length];
+          const valid=rows.map(row=>lesson6ScoreHit(row[field],cut)).filter(hit=>hit!==null);
+          return [valid.filter(Boolean).length,valid.length];
         }):bedtime.map(rows=>[rows.filter(row=>row.자정이후취침==='예').length,rows.length]);
         const [a,b]=counts.map(([yes,n])=>n?Math.round(yes/n*100):'');
         const [beforeDays,afterDays]=counts.map(([,n])=>n);
@@ -5244,13 +5279,40 @@ function researchCaffeineSheets(source, period) {
     }
 
     function lesson6MetricRows(entry, individual, extra) {
-      const names=['수면시간','컨디션','카페인 양','늦은 카페인','자기 전 폰'];
       const units=['시간','점','mg','%','%'];
-      const existing=beforeAfterMetricRows(entry.summary,individual).map((row,i)=>({
-        name:names[i],label:row.항목,unit:units[i],before:row['앞 기간'],after:row['뒤 기간'],
+      const saved=beforeAfterMetricRows(entry.summary,individual);
+      const late=saved[3].항목.split(' 이후 ')[0];
+      const names=[
+        ['평균 수면시간','평균 수면시간 (취침~기상, 시간)'],
+        ['평균 기상 후 컨디션','평균 기상 후 컨디션 (1~5점)'],
+        ['자정 이후 잠자리','자정 이후에 잠자리에 든 날 (%)'],
+        ['잠들기까지 30분 이상','잠들기까지 30분 이상 걸린 날 (%)'],
+        ['자다가 깸','자다가 1번 이상 깬 날 (%)'],
+        ['낮 졸림·집중 저하',"낮 졸림·집중 저하가 '꽤 힘들었음' 이상인 날 (%)"],
+        ['하루 평균 카페인','하루 평균 카페인 섭취량 (mg)'],
+        [late+' 이후 카페인',late+' 이후 카페인을 섭취한 날 (%)'],
+        ['취침 전 스마트폰 30분 이상','취침 전 스마트폰 사용 30분 이상인 날 (%)'],
+        ['신체활동 30분 이상','신체활동 30분 이상 한 날 (%)']
+      ];
+      const existing=saved.map((row,i)=>({
+        unit:units[i],before:row['앞 기간'],after:row['뒤 기간'],
         beforeDays:row['앞 기록일수'],afterDays:row['뒤 기록일수'],result:row.결과
       }));
-      return [existing[0],existing[1],...extra.slice(0,4),...existing.slice(2),extra[4]];
+      return [existing[0],existing[1],...extra.slice(0,4),...existing.slice(2),extra[4]]
+        .map((row,i)=>({...row,name:names[i][0],label:names[i][1]}));
+    }
+
+    function lesson6CaffeineReference(klass,sid=null) {
+      const records=studentRuleContexts.get(state)?.records||[];
+      const classes=beforeAfterRosterClasses(state);
+      const selected=records.filter(row=>{
+        if(row.limit===null)return false;
+        if(sid!==null)return row.sid===sid;
+        const code=beforeAfterClassKey(classes.get(row.sid));
+        return klass?code===klass:Object.hasOwn(CLASS_COMPARE_PERIODS,code);
+      });
+      const count=selected.length;
+      return {value:count?selected.reduce((sum,row)=>sum+row.limit/count,0):null,count};
     }
 
     function lesson6PeriodLine(dates, klass="") {
@@ -5262,23 +5324,68 @@ function researchCaffeineSheets(source, period) {
       return prefix+(klass?'앞 ':'앞 기간 ')+period(a,b)+' · '+(klass?'뒤 ':'뒤 기간 ')+period(c,d);
     }
 
-    function lesson6PersonalModel(entry) {
+    function lesson6PersonalDays(entry,dates) {
+      const {info,studentRows}=entry;
+      const source=info._classroomExample?state?.classroom:state;
+      const afternoon=Number($('afternoonHour')?.value||state?.options?.afternoonHour||15);
+      const index=studentRuleSleepIndex(studentRows.filter(row=>row.주수면분석상태==='사용'));
+      const empty=['기록 없음',''];
+      const answer=hit=>hit?'예':'아니오';
+      const scoreValue=(row,field,raw,cut)=>{
+        const hit=lesson6ScoreHit(row?.[field],cut);
+        return hit===null?empty:[String(row[raw]),answer(hit)];
+      };
+      return [entry.before,entry.during].map((rows,side)=>{
+        const sleep=new Map(rows.map(row=>[row.분석일,row]));
+        const beds=new Map(lesson6BedtimeRecords(rows,index).map(row=>[row.분석일,row]));
+        const [start,end]=dates.slice(side*2,side*2+2).map(parseDateFlexible);
+        return calendarCaffeineDays(info._학번??info.학번??'',start,end,afternoon,source).map(day=>{
+          const row=sleep.get(day.날짜),bed=beds.get(day.날짜);
+          const amount=day.기록기반총량_mg,late=day.오후섭취여부;
+          const unavailable=day.기록상태.includes('함량 누락')?['함량 확인 필요','']:empty;
+          return {date:day.날짜,values:[
+            Number.isFinite(row?.수면시간_h)?[row.수면시간_h.toFixed(1)+'시간','']:empty,
+            Number.isFinite(row?.수면컨디션_점수)?[row.수면컨디션_점수+'점','']:empty,
+            bed?[bed.취침시각_HHMM,bed.자정이후취침]:empty,
+            scoreValue(row,'수면잠복기_점수','수면잠복기_원자료',3),
+            scoreValue(row,'중도각성_점수','중도각성_원자료',2),
+            scoreValue(row,'낮졸음집중력_점수','낮졸음집중력_원자료',3),
+            amount===''?unavailable:[amount+'mg',''],
+            late===''?unavailable:[late?'마심':'안 마심',answer(late)],
+            scoreValue(row,'취침전스마트폰_점수','취침전스마트폰_원자료',3),
+            scoreValue(row,'신체활동_점수','신체활동시간_원자료',3)
+          ]};
+        });
+      });
+    }
+
+    function lesson6UnambiguousStudent(entry) {
+      const sid=idText(entry.info._학번);
+      return !!sid&&entry.studentRows.every(row=>idText(row._학번)===sid);
+    }
+
+    function lesson6PersonalModel(entry,includeDaily=false) {
+      if(!lesson6UnambiguousStudent(entry))return null;
       const {summary}=entry;
+      const dates=[summary.초기시작일,summary.초기종료일,summary.종료시작일,summary.종료종료일];
+      const days=lesson6PersonalDays(entry,dates);
+      const metrics=lesson6MetricRows(entry,true,lesson6ExtraMetrics(entry.before,entry.during,entry.studentRows))
+        .map((metric,i)=>metric.unit==='%'?{...metric,hits:days.map(period=>period.filter(day=>day.values[i][1]==='예').length)}:metric);
       return {
         title:[summary.전체학번,summary.성명].filter(Boolean).join(' '),
-        periods:[lesson6PeriodLine([summary.초기시작일,summary.초기종료일,summary.종료시작일,summary.종료종료일])],
+        periods:[lesson6PeriodLine(dates)],
+        periodDays:[summary.초기관찰일수,summary.종료관찰일수],
         prefix:'6차시_개인예시',
-        metrics:lesson6MetricRows(entry,true,lesson6ExtraMetrics(entry.before,entry.during,entry.studentRows))
+        caffeineReference:lesson6CaffeineReference('',idText(entry.info._학번)),
+        metrics,...(includeDaily?{daily:days[1]}:{})
       };
     }
 
-    function lesson6ExampleModel(period) {
+    function lesson6ExampleModel(period,entries=buildBeforeAfterEntries(rowsForBeforeAfterSelection(),period)) {
       const klass=$("classSelectCompare").value;
       const sid=$("studentCompareSelect").value;
       const label=klass?klass+'반':'전체';
-      const entries=buildBeforeAfterEntries(rowsForBeforeAfterSelection(),period)
-        .filter(({info})=>klass||Object.hasOwn(CLASS_COMPARE_PERIODS,beforeAfterClassKey(info.반)));
-      const students=entries.map(entry=>{
+      const students=entries.filter(({info})=>klass||Object.hasOwn(CLASS_COMPARE_PERIODS,beforeAfterClassKey(info.반))).map(entry=>{
         const extra=lesson6ExtraMetrics(entry.before,entry.during,entry.studentRows);
         return {stored:lesson6MetricRows(entry,false,extra),student:lesson6MetricRows(entry,true,extra)};
       });
@@ -5300,7 +5407,8 @@ function researchCaffeineSheets(source, period) {
         Object.keys(CLASS_COMPARE_PERIODS).map(key=>lesson6PeriodLine(periodDates(period.byClass?.[key]||period),key));
       const selected=sid&&buildBeforeAfterEntries(rowsForBeforeAfterSelection(klass,true).filter(row=>row.익명ID===sid),period)[0];
       return {label,results,classChart:{
-        title:klass?label+' 평균':'전체 1~4반 평균',periods,total:students.length,prefix:'6차시_'+safeFileName(label)+'_반평균',metrics
+        title:klass?label+' 평균':'전체 1~4반 평균',periods,total:students.length,prefix:'6차시_'+safeFileName(label)+'_반평균',
+        caffeineReference:lesson6CaffeineReference(klass),metrics
       },personal:selected?lesson6PersonalModel(selected):null};
     }
 
@@ -5324,14 +5432,19 @@ function researchCaffeineSheets(source, period) {
 
     function lesson6MotionSvg(chart,metric,key) {
       const values=[metric.before,metric.after],precision=lesson6Precision(metric.unit);
-      const {maximum,step}=lesson6Axis(metric.unit,values);
-      const title=chart.title+' · '+metric.name;
-      const top=104+chart.periods.length*21,bottom=top+205;
-      const y=value=>bottom-(bottom-top)*value/maximum;
-      const axis=[];
-      for(let value=0;value<=maximum;value+=step){
-        axis.push(`<line x1="76" y1="${y(value)}" x2="746" y2="${y(value)}" stroke="${value===0?'#98A2B3':'#E4E7EC'}"/><text data-axis-tick="" x="66" y="${y(value)+4}" text-anchor="end" font-size="12">${value}</text>`);
-      }
+      const reference=metric.unit==='mg'?chart.caffeineReference?.value:null;
+      const {maximum,step}=lesson6Axis(metric.unit,[...values,reference??0]);
+      const title=chart.title+' · '+metric.label;
+      const wrapTitle=title.length>42;
+      const titleOffset=wrapTitle?24:0;
+      const top=104+titleOffset+chart.periods.length*21,bottom=top+205;
+      const y=value=>bottom-(bottom-top)*(value/maximum);
+      // Combine subpixel-spaced grid lines for extreme inputs without changing the scale.
+      const visibleStep=step*Math.max(1,Math.ceil((maximum/step)/(bottom-top)));
+      const ticks=[];
+      for(let i=0;i*visibleStep<maximum;i++)ticks.push(i*visibleStep);
+      ticks.push(maximum);
+      const axis=ticks.map(value=>`<line x1="76" y1="${y(value)}" x2="746" y2="${y(value)}" stroke="${value===0?'#98A2B3':'#E4E7EC'}"/><text data-axis-tick="" x="66" y="${y(value)+4}" text-anchor="end" font-size="12">${value}</text>`);
       const centers=[245,565],colors=['#9AA4B2','#3B6FD8'],periods=['앞 기간','뒤 기간'];
       const bars=values.map((value,i)=>{
         const x=centers[i];
@@ -5345,17 +5458,28 @@ function researchCaffeineSheets(source, period) {
       const arrow=comparable?`<defs><marker id="${marker}" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto"><path d="M0 0 L8 4 L0 8 Z" fill="#344054"/></marker></defs>
         <path data-motion-arrow="" pathLength="1" d="M299 ${y(values[0])} L511 ${y(values[1])}" fill="none" stroke="#344054" stroke-width="2" marker-end="url(#${marker})"/>`:'';
       const labelY=comparable?Math.min(...values.map(y))-18:top-15;
-      const caption=chart.total===undefined?`앞 기록 ${metric.beforeDays}일 · 뒤 기록 ${metric.afterDays}일`:
-        `포함 ${metric.count}명 / 전체 ${chart.total}명 · 앞·뒤 기록이 각각 2일 이상인 학생`;
+      const captions=chart.total!==undefined?[`포함 ${metric.count}명 / 전체 ${chart.total}명 · 앞·뒤 기록이 각각 2일 이상인 학생`]:
+        metric.hits?periods.map((period,i)=>`${period} ${chart.periodDays[i]}일 중 기록 ${[metric.beforeDays,metric.afterDays][i]}일 · 해당 ${metric.hits[i]}일`):
+          [`앞 기간 기록 ${metric.beforeDays}일 · 뒤 기간 기록 ${metric.afterDays}일`];
       const clock=metric.bedtime?.map(value=>lesson6Clock(value)||'기록 없음');
-      const height=bottom+(clock?109:86);
-      const periodLines=chart.periods.map((line,i)=>`<text x="34" y="${64+i*21}" font-size="14">${escapeHtml(line)}</text>`).join('');
+      const refValue=reference==null?'':Number(formatCaffeineDisplay(reference))+'mg';
+      const refLabel=reference==null?'체중 기록이 없어 최대 섭취량 기준선을 표시하지 않았어요.':
+        chart.total===undefined?'내 하루 최대 섭취량 참고 '+refValue+' (내 체중 기준)':
+          '하루 최대 섭취량 참고 '+refValue+' (반 평균 체중 기준, 체중 기록 '+chart.caffeineReference.count+'명)';
+      const notes=metric.unit==='mg'?[refLabel,'최대 섭취량은 섭취 목표가 아니에요. 이보다 적게 마시거나 마시지 않아도 돼요.',
+        ...(chart.total===undefined?[]:['반 평균 기준은 내 개인 기준이 아니에요.'])]:[];
+      const footerLines=[...captions,...(clock?['평균 취침시각 '+clock.join(' → ')]:[]),...notes];
+      const height=bottom+62+footerLines.length*22;
+      const periodLines=chart.periods.map((line,i)=>`<text x="34" y="${64+titleOffset+i*21}" font-size="14">${escapeHtml(line)}</text>`).join('');
+      const refLine=reference==null?'':`<line data-caffeine-reference="" x1="76" y1="${y(reference)}" x2="746" y2="${y(reference)}" stroke="#9A4F13" stroke-width="2" stroke-dasharray="6 5"/>`;
+      const footer=footerLines.map((line,i)=>`<text x="34" y="${bottom+53+i*22}" font-size="14"${line===refLabel?' font-weight="700" fill="#7A4218"':''}>${escapeHtml(line)}</text>`).join('');
+      const titleSvg=wrapTitle?`<text x="34" y="32" font-size="21" font-weight="700">${escapeHtml(chart.title)} ·</text><text x="34" y="56" font-size="20" font-weight="700">${escapeHtml(metric.label)}</text>`:
+        `<text x="34" y="37" font-size="22" font-weight="700">${escapeHtml(title)}</text>`;
       return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 ${height}" width="800" height="${height}" role="img" aria-label="${escapeHtml(title)}" font-family="Segoe UI, Malgun Gothic, Noto Sans KR, sans-serif" fill="#172033">
-        <rect width="800" height="${height}" fill="white"/><text x="34" y="37" font-size="22" font-weight="700">${escapeHtml(title)}</text>
+        <rect width="800" height="${height}" fill="white"/>${titleSvg}
         ${periodLines}<g transform="translate(528 ${top-38})" font-size="13"><rect width="14" height="14" fill="#9AA4B2"/><text x="20" y="12">앞 기간</text><rect x="103" width="14" height="14" fill="#3B6FD8"/><text x="123" y="12">뒤 기간</text></g>
-        ${axis.join('')}${bars}${arrow}<text data-motion-label="" x="405" y="${labelY}" text-anchor="middle" fill="#344054" font-size="16" font-weight="700">${escapeHtml(delta)}</text>
-        <text x="34" y="${bottom+53}" font-size="14">${escapeHtml(metric.label)} · ${escapeHtml(caption)}</text>
-        ${clock?`<text x="34" y="${bottom+78}" font-size="14">평균 취침시각 ${clock.join(' → ')}</text>`:''}</svg>`;
+        ${axis.join('')}${bars}${refLine}${arrow}<text data-motion-label="" x="405" y="${labelY}" text-anchor="middle" fill="#344054" font-size="16" font-weight="700">${escapeHtml(delta)}</text>
+        ${footer}</svg>`;
     }
 
     function lesson6ExampleTable(title,headers,rows) {
@@ -5435,13 +5559,14 @@ function researchCaffeineSheets(source, period) {
     }
 
     function lesson6MotionRuntime(root,view,initial=0,initialReplay=true) {
-      const {personal,classChart,results,student}=view;
+      const {personal,classChart,results,student,classStudent}=view;
       const charts={...(personal?{personal}:{}),...(classChart?{classChart}:{})};
       const metrics=(personal||classChart).metrics;
       const controls=(title,from,to)=>`<div class="lesson6-controls" role="group" aria-label="${title}"><b>${title}</b>${metrics.slice(from,to).map(({name},i)=>`<button type="button" data-metric="${from+i}" aria-pressed="false">${escapeHtml(name)}</button>`).join('')}</div>`;
-      const intro=student?`<h1>나의 6차시 전후 그래프</h1><p>${escapeHtml(personal.title)}</p><p>${escapeHtml(personal.periods[0])}</p>`:
-        '<h2>6차시 모범 그래프</h2><p class="lesson3-reference">교사용 참고 예시이며 유일한 정답이 아닙니다. 학생은 먼저 직접 그래프를 만든 뒤 비교합니다.</p>';
-      const studentGuide=student?'<footer><p>활동지 수사 1·2의 표와 막대그래프는 엑셀로 직접 만들어요. 이 그래프는 다른 항목을 더 살펴보는 참고 자료예요.</p><p>평균은 기록한 날만으로 계산해요. 기록이 2일보다 적으면 비교하지 않아요.</p><p>함께 변했다고 해서 원인이라고 단정할 수는 없어요.</p></footer>':'';
+      const intro=student?`<h1>${lesson6DocumentTitle(view)}</h1><p>${escapeHtml(personal.title)}</p><p>${escapeHtml(personal.periods[0])}</p>`:
+        classStudent?`<h1>${lesson6DocumentTitle(view)}</h1>${classChart.periods.map(line=>`<p>${escapeHtml(line)}</p>`).join('')}`:
+          '<h2>6차시 모범 그래프</h2><p class="lesson3-reference">교사용 참고 예시이며 유일한 정답이 아닙니다. 학생은 활동지에서 비교 자료를 고르고 그래프를 읽습니다.</p>';
+      const studentGuide=student?'<footer><p>그래프에서 항목을 골라 앞·뒤 기간의 값과 결과를 읽고 활동지에 적어요.</p><p>평균은 기록한 날만으로 계산해요. 기록이 2일보다 적으면 비교하지 않아요.</p><p>함께 변했다고 해서 원인이라고 단정할 수는 없어요.</p></footer>':'';
       const format=(value,unit)=>value===''?'':value.toFixed(lesson6Precision(unit))+unit;
       const resultHeaders=['늘었어요','비슷해요','줄었어요','기록이 적어 비교 어려워요'];
       const tables=classChart?
@@ -5466,18 +5591,24 @@ function researchCaffeineSheets(source, period) {
       function draw(replay=true) {
         root.dataset.metric=String(selected);
         for(const btn of root.querySelectorAll('[data-metric]'))btn.setAttribute('aria-pressed',String(Number(btn.dataset.metric)===selected));
-        const missing=!personal&&!student?'<p>학생을 선택하면 그 학생이 만들 그래프의 예시를 보여 줍니다.</p>':'';
+        const missing=!personal&&!student&&!classStudent?'<p>학생을 선택하면 그 학생의 모범 그래프를 보여 줍니다.</p>':'';
         area.innerHTML=missing+Object.entries(charts).map(([key,chart])=>{
           const metric=chart.metrics[selected];
-          const readout=student?lesson6ExampleTable('선택 항목 기록',['항목','앞','뒤','결과','앞 기록일수','뒤 기록일수'],[[
-            metric.label,format(metric.before,metric.unit),format(metric.after,metric.unit),metric.result,metric.beforeDays,metric.afterDays
-          ]]):'';
+          const readout=student?lesson6ExampleTable('선택 항목 기록',['기간','값','기간 일수','기록일수',...(metric.hits?['해당일수']:[])],
+            [['앞 기간',metric.before,metric.beforeDays],['뒤 기간',metric.after,metric.afterDays]].map(([period,value,records],i)=>
+              [period,format(value,metric.unit),chart.periodDays[i]+'일',records+'일',...(metric.hits?[metric.hits[i]+'일']:[])]))+
+              `<p>결과 · ${escapeHtml(metric.result)}</p>`:'';
+          const daily=student?`<p>내 목표 기준에 맞춰 지킨 날을 세어 활동지에 적어요.</p>`+
+            lesson6ExampleTable('실천 기간 날짜별 기록',['날짜(요일)','기록값','해당 여부'],chart.daily.map(day=>{
+              const weekday='일월화수목금토'[new Date(day.date).getUTCDay()];
+              return [day.date+' ('+weekday+')',...day.values[selected]];
+            }))+'<p>날짜는 잠든 밤 기준이에요(예: 11/5 밤에 자고 11/6 아침에 일어난 잠 = 11/5).</p>':'';
           const reading=key==='classChart'?`<p data-lesson6-interpretation>${metric.count?
-            escapeHtml(`반 평균 ${metric.name}은 앞 기간 ${format(metric.before,metric.unit)}, 뒤 기간 ${format(metric.after,metric.unit)}로 ${metric.result}. (포함 ${metric.count}명)`):
+            escapeHtml(`반 평균 ${metric.name.replace(/^평균 /,'')}은 앞 기간 ${format(metric.before,metric.unit)}, 뒤 기간 ${format(metric.after,metric.unit)}로 ${metric.result}. (포함 ${metric.count}명)`):
             '앞·뒤 기록이 각각 2일 이상인 학생이 없어 반 평균을 비교하지 않았어요.'}</p><p>함께 변했다고 해서 목표 행동이 원인이라고 단정할 수는 없어요. 시험·행사처럼 그 기간에 달라진 일도 함께 생각해 봅니다.</p>`:'';
           return `<section data-chart="${key}"><figure>${lesson6MotionSvg(chart,metric,key)}
             <figcaption class="lesson6-actions"><button type="button" data-chart-action="png">PNG 저장</button><button type="button" data-chart-action="copy">이미지 복사</button>
-            <span role="status" class="lesson6-status"></span></figcaption></figure>${readout}${reading}</section>`;
+            <span role="status" class="lesson6-status"></span></figcaption></figure>${readout}${daily}${reading}</section>`;
         }).join('');
         if(replay)for(const [key,chart] of Object.entries(charts))lesson6Animate(area.querySelector('[data-chart="'+key+'"] svg'),chart.metrics[selected]);
       }
@@ -5516,11 +5647,20 @@ function researchCaffeineSheets(source, period) {
         personal:personal?{...personal,title:hideName?'선택한 학생':personal.title}:null};
     }
 
+    function lesson6ClassStudentView(model) {
+      return {classStudent:true,classChart:model.classChart,results:model.results};
+    }
+
+    function lesson6DocumentTitle(view) {
+      return view.student?'나의 6차시 전후 그래프 (개인)':
+        view.classStudent?'우리 반 6차시 전후 그래프 (반)':'6차시 교사용 모범 그래프';
+    }
+
     function lesson6StandaloneHtml(view) {
-      const title=view.student?'나의 6차시 전후 그래프':'6차시 교사용 모범 그래프';
+      const title=lesson6DocumentTitle(view);
       const data=JSON.stringify(view).replaceAll('<','\\u003c');
-      const helpers=[escapeHtml,lesson6Precision,lesson6Axis,lesson6ChangeLabel,lesson6Clock,lesson6MotionSvg,
-        lesson6ExampleTable,lesson6Animate,lesson6Png,saveLesson3Blob,lesson6MotionRuntime];
+      const helpers=[escapeHtml,formatCaffeineDisplay,lesson6Precision,lesson6Axis,lesson6ChangeLabel,lesson6Clock,lesson6MotionSvg,
+        lesson6ExampleTable,lesson6Animate,lesson6Png,saveLesson3Blob,lesson6DocumentTitle,lesson6MotionRuntime];
       const script=helpers.map(fn=>fn.toString()).join('\n')+'\nlesson6MotionRuntime(document.getElementById("lesson6-motion"),'+data+');';
       return `<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
         <title>${title}</title><style>body{font-family:Segoe UI,Malgun Gothic,sans-serif;max-width:980px;margin:22px auto;padding:0 16px;color:#172033;line-height:1.5}</style></head>
@@ -5560,7 +5700,7 @@ function researchCaffeineSheets(source, period) {
     }
 
     function lesson6StudentHtml(entry) {
-      const personal=lesson6PersonalModel(entry);
+      const personal=lesson6PersonalModel(entry,true);
       return lesson6StandaloneHtml({student:true,personal:{...personal,prefix:'6차시_개인그래프'}});
     }
 
@@ -5571,6 +5711,7 @@ function researchCaffeineSheets(source, period) {
       const rows=rowsForBeforeAfterSelection($("classSelectCompare").value,true).filter(row=>row.익명ID===sid);
       const entry=buildBeforeAfterEntries(rows,period)[0];
       if(!entry){alert("선택한 학생의 전후 비교 데이터가 없습니다.");return;}
+      if(!lesson6UnambiguousStudent(entry)){alert("학생 식별이 겹치는 기록이 있어 개인 그래프 HTML을 만들 수 없습니다.");return;}
       saveLesson3Blob(new Blob([lesson6StudentHtml(entry)],{type:"text/html;charset=utf-8"}),lesson6StudentHtmlName(entry.info));
     }
 
