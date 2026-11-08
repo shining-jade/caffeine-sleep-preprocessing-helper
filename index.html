@@ -371,6 +371,19 @@
     .example-zip-choice { display: inline-flex; align-items: center; gap: 6px; margin: 0; font-size: 12px; font-weight: 500; }
     input[type="checkbox"] { width: 16px; height: 16px; min-height: 0; padding: 0; margin: 0; flex: 0 0 16px; }
     .checkbox-choice, .example-zip-choice { display: inline-flex; align-items: center; gap: 6px; min-height: 40px; }
+    .lesson6-personal-zip {
+      box-sizing: border-box;
+      width: 100%;
+      min-inline-size: 0;
+      margin: 0;
+      padding: 8px 12px 10px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #f8faff;
+    }
+    .lesson6-personal-zip legend { padding: 0 5px; font-size: 13px; font-weight: 700; }
+    .lesson6-personal-zip-options { display: flex; flex-wrap: wrap; gap: 0 14px; margin-top: 4px; }
+    .lesson6-personal-zip-options .checkbox-choice { min-height: 32px; max-width: 100%; }
     .lesson3-graphs{display:grid;gap:14px;margin-top:16px}.lesson3-graphs figure{margin:0;border:1px solid var(--line);border-radius:8px;background:#fff;padding:10px}.lesson3-graphs svg{width:100%;height:auto;display:block}.lesson3-graphs figcaption{padding-top:8px}.lesson3-answers{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-top:18px}.lesson3-answers section{border:1px solid var(--line);border-radius:8px;background:#fff;padding:14px}.lesson3-answers h3{font-size:15px;color:var(--brand);margin:0 0 8px}.lesson3-answers p,#lesson3ExamplePanel>p{font-size:14px;line-height:1.65}.lesson3-reference{background:#fffaeb;border:1px solid #fedf89;padding:12px;border-radius:8px}@media(max-width:700px){.lesson3-answers{grid-template-columns:1fr}}
     #lesson6ExamplePanel { padding:18px; }
     .lesson6-example section { margin:20px 0; }
@@ -410,7 +423,7 @@
   <header>
     <h1>교사용 카페인·수면 분석자료 생성기 v79</h1>
     <p>교사가 카페인·수면 원자료를 넣으면, 학생 활동에 사용할 반별·개인별 분석 데이터와 AI 분석용 CSV를 자동 생성합니다.</p>
-    <p id="publication-update">최근 반영: <time datetime="2026-11-08T05:48:17Z">2026-11-08 14:48:17 한국시간</time>. 6차시 카페인 기준선 옆에 기준값을 표시하고, 개인별 ZIP에 반별 자료를 함께 넣는 옵션을 추가했습니다. 이전 화면이면 파일 선택 전에 Ctrl+F5로 새로고침하세요.</p>
+    <p id="publication-update">최근 반영: <time datetime="2026-11-08T06:28:04Z">2026-11-08 15:28:04 한국시간</time>. 6차시 개인별 ZIP 저장 버튼과 반별 자료 추가 체크란을 같은 상자에 모았습니다. 이전 화면이면 파일 선택 전에 Ctrl+F5로 새로고침하세요.</p>
   </header>
 
   <main>
@@ -559,10 +572,15 @@
               <button id="downloadBeforeAfterOne" class="secondary" disabled>📥 6차시용 개인 전후 비교 자료</button>
               <button type="button" id="downloadLesson6StudentHtml" class="secondary" disabled>📈 개인 그래프 HTML</button>
               <button id="downloadBeforeAfter" class="secondary" disabled>📥 6차시용 전후 비교 자료 (반) ZIP</button>
-              <button id="downloadBeforeAfterZip" class="secondary" disabled>📥 개인별 전후 비교 자료 ZIP</button>
-              <label class="checkbox-choice"><input id="includeLesson6Html" type="checkbox" checked>개인 그래프(HTML) 함께 넣기</label>
-              <label class="checkbox-choice"><input id="includeLesson6ClassFiles" type="checkbox">반별 자료(교사용 포함) 함께 넣기</label>
-              <label class="example-zip-choice"><input id="includeExampleCompare" type="checkbox">개인별 ZIP에 수업용 예시 포함</label>
+              <fieldset class="lesson6-personal-zip">
+                <legend>개인별 ZIP 저장 옵션</legend>
+                <button id="downloadBeforeAfterZip" class="secondary" disabled>📥 개인별 전후 비교 자료 ZIP</button>
+                <div class="lesson6-personal-zip-options">
+                  <label class="checkbox-choice"><input id="includeLesson6Html" type="checkbox" checked>개인 그래프(HTML) 포함</label>
+                  <label class="checkbox-choice"><input id="includeLesson6ClassFiles" type="checkbox">개인별 ZIP에 반별 자료 추가 (교사용 포함)</label>
+                  <label class="checkbox-choice"><input id="includeExampleCompare" type="checkbox">수업용 예시 포함</label>
+                </div>
+              </fieldset>
               <button type="button" id="showLesson6Examples" class="secondary" aria-controls="lesson6ExamplePanel" aria-expanded="false" disabled>📊 6차시 모범 그래프 보기</button>
               <label class="checkbox-choice"><input id="hideLesson6ExampleIdentity" type="checkbox" checked>화면 시범 모드(이름 가리기)</label>
             </div>
