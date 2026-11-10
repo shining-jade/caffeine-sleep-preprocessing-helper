@@ -443,7 +443,7 @@
   <header>
     <h1>교사용 카페인·수면 분석자료 생성기 v79</h1>
     <p>교사가 카페인·수면 원자료를 넣으면, 학생 활동에 사용할 반별·개인별 분석 데이터와 AI 분석용 CSV를 자동 생성합니다.</p>
-    <p id="publication-update">최근 반영: <time datetime="2026-11-10T00:46:28Z">2026-11-10 09:46:28 한국시간</time>. 6차시 개인·반 평균 그래프를 나란히 보고, 전체 화면에서 학생과 비교 항목을 바꿀 수 있습니다. 이전 화면이면 파일 선택 전에 Ctrl+F5로 새로고침하세요.</p>
+    <p id="publication-update">최근 반영: <time datetime="2026-11-10T01:53:06Z">2026-11-10 10:53:06 한국시간</time>. 6차시 모범 그래프의 전체 화면에서 학생 이름을 표시하거나 가릴 수 있습니다. 이전 화면이면 파일 선택 전에 Ctrl+F5로 새로고침하세요.</p>
   </header>
 
   <main>
@@ -602,7 +602,7 @@
                 </div>
               </fieldset>
               <button type="button" id="showLesson6Examples" class="secondary" aria-controls="lesson6ExamplePanel" aria-expanded="false" disabled>📊 6차시 모범 그래프 보기</button>
-              <label class="checkbox-choice"><input id="hideLesson6ExampleIdentity" type="checkbox" checked>화면 시범 모드(이름 가리기)</label>
+              <label class="checkbox-choice"><input id="hideLesson6ExampleIdentity" type="checkbox" checked>화면 시범 모드(그래프 이름 가리기)</label>
             </div>
           </div>
         </div>
@@ -612,6 +612,7 @@
             <button type="button" class="secondary" onclick="downloadLesson6ExampleHtml()">교사용 HTML 저장</button>
             <button type="button" id="lesson6ExampleExpand" class="secondary" aria-haspopup="dialog" aria-controls="lesson6ExampleDialog">전체 화면</button>
             <label class="lesson6-viewer-only">학생 선택 <select id="lesson6ViewerStudent"></select></label>
+            <label class="checkbox-choice lesson6-viewer-only"><input id="hideLesson6ViewerStudentNames" type="checkbox">학생 선택에서 이름 가리기</label>
             <button type="button" id="lesson6ExampleClose" class="secondary lesson6-viewer-only">전체 화면 닫기</button>
           </div>
           <div id="lesson6ExampleMotion" class="lesson6-motion"></div>
@@ -5768,20 +5769,24 @@ function researchCaffeineSheets(source, period) {
       renderLesson6Example();
     }
 
+    function populateLesson6ViewerStudents() {
+      const source=$("studentCompareSelect");
+      const student=$("lesson6ViewerStudent");
+      const hideName=$("hideLesson6ViewerStudentNames").checked;
+      student.replaceChildren(...Array.from(source.options,(option,i)=>
+        new Option(hideName&&i?`학생 ${i}`:option.textContent,option.value)));
+      student.value=source.value;
+    }
+
     function openLesson6ExampleViewer() {
       if(!currentLesson6Example())return;
       const dialog=$("lesson6ExampleDialog");
       if(dialog.open)return;
       const panel=$("lesson6ExamplePanel");
-      const source=$("studentCompareSelect");
-      const student=$("lesson6ViewerStudent");
-      const hideName=$("hideLesson6ExampleIdentity").checked;
-      student.replaceChildren(...Array.from(source.options,(option,i)=>
-        new Option(hideName&&i?`학생 ${i}`:option.textContent,option.value)));
-      student.value=source.value;
+      populateLesson6ViewerStudents();
       dialog.append(panel);
       dialog.showModal();
-      student.focus();
+      $("lesson6ViewerStudent").focus();
       if(document.fullscreenEnabled&&!document.fullscreenElement&&panel.requestFullscreen){
         panel.requestFullscreen().then(()=>{
           if(!dialog.open&&document.fullscreenElement===panel)return document.exitFullscreen();
@@ -5998,6 +6003,7 @@ function researchCaffeineSheets(source, period) {
       if(dialog.open&&document.fullscreenElement!==$("lesson6ExamplePanel"))dialog.close();
     });
     $("lesson6ViewerStudent").addEventListener("change",selectLesson6ViewerStudent);
+    $("hideLesson6ViewerStudentNames").addEventListener("change",populateLesson6ViewerStudents);
     $("downloadLesson6StudentHtml").addEventListener("click",downloadLesson6StudentHtml);
     $("hideLesson6ExampleIdentity").addEventListener("change",()=>renderLesson6Example());
     ["analysisStart","analysisEnd","afternoonHour"].forEach(id=>{
