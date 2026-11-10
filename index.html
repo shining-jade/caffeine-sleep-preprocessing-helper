@@ -386,6 +386,26 @@
     .lesson6-personal-zip-options .checkbox-choice { min-height: 32px; max-width: 100%; }
     .lesson3-graphs{display:grid;gap:14px;margin-top:16px}.lesson3-graphs figure{margin:0;border:1px solid var(--line);border-radius:8px;background:#fff;padding:10px}.lesson3-graphs svg{width:100%;height:auto;display:block}.lesson3-graphs figcaption{padding-top:8px}.lesson3-answers{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-top:18px}.lesson3-answers section{border:1px solid var(--line);border-radius:8px;background:#fff;padding:14px}.lesson3-answers h3{font-size:15px;color:var(--brand);margin:0 0 8px}.lesson3-answers p,#lesson3ExamplePanel>p{font-size:14px;line-height:1.65}.lesson3-reference{background:#fffaeb;border:1px solid #fedf89;padding:12px;border-radius:8px}@media(max-width:700px){.lesson3-answers{grid-template-columns:1fr}}
     #lesson6ExamplePanel { padding:18px; }
+    .lesson6-example-toolbar { display:flex; align-items:center; flex-wrap:wrap; gap:8px 12px; }
+    .lesson6-example-toolbar .lesson6-viewer-only { display:none; }
+    #lesson6ExampleDialog { box-sizing:border-box; inset:0; margin:0; padding:0; border:0; width:100%; max-width:none; height:100dvh; max-height:none; overflow:hidden; color:var(--ink); }
+    #lesson6ExampleDialog[open] #lesson6ExamplePanel {
+      display:flex !important; flex-direction:column; width:100%; height:100%; margin:0;
+      padding:clamp(8px,2vw,20px); overflow:hidden; background:#fff;
+    }
+    #lesson6ExampleDialog[open] .lesson6-viewer-only { display:inline-flex; align-items:center; flex-wrap:wrap; gap:6px; }
+    #lesson6ExampleDialog[open] #lesson6ExampleExpand { display:none; }
+    #lesson6ExampleDialog[open] .lesson6-motion { display:flex; flex-direction:column; min-height:0; flex:1; }
+    #lesson6ExampleDialog[open] .lesson6-motion h2 { margin:10px 0 0; }
+    #lesson6ExampleDialog[open] .lesson3-reference { margin:6px 0; padding:6px 10px; }
+    #lesson6ExampleDialog[open] .lesson6-content { overflow:auto; min-height:0; }
+    #lesson6ExampleDialog[open] figure { max-width:none; }
+    body:has(#lesson6ExampleDialog[open]) { overflow:hidden; }
+    @media(max-height:500px) {
+      #lesson6ExampleDialog[open] #lesson6ExamplePanel { overflow:auto; }
+      #lesson6ExampleDialog[open] .lesson6-motion { display:block; flex:none; }
+      #lesson6ExampleDialog[open] .lesson6-content { overflow:visible; }
+    }
     .lesson6-example section { margin:20px 0; }
     .lesson6-example figure { margin:12px 0; padding:10px; max-width:800px; border:1px solid var(--line); border-radius:8px; background:white; }
     .lesson6-example svg { display:block; width:100%; height:auto; }
@@ -423,7 +443,7 @@
   <header>
     <h1>교사용 카페인·수면 분석자료 생성기 v79</h1>
     <p>교사가 카페인·수면 원자료를 넣으면, 학생 활동에 사용할 반별·개인별 분석 데이터와 AI 분석용 CSV를 자동 생성합니다.</p>
-    <p id="publication-update">최근 반영: <time datetime="2026-11-08T09:46:09Z">2026-11-08 18:46:09 한국시간</time>. 6차시 그래프는 생활습관부터 보여 주고 하루 평균 카페인 그래프를 먼저 엽니다. 이전 화면이면 파일 선택 전에 Ctrl+F5로 새로고침하세요.</p>
+    <p id="publication-update">최근 반영: <time datetime="2026-11-10T00:46:28Z">2026-11-10 09:46:28 한국시간</time>. 6차시 개인·반 평균 그래프를 나란히 보고, 전체 화면에서 학생과 비교 항목을 바꿀 수 있습니다. 이전 화면이면 파일 선택 전에 Ctrl+F5로 새로고침하세요.</p>
   </header>
 
   <main>
@@ -587,7 +607,16 @@
           </div>
         </div>
 
-        <div id="lesson6ExamplePanel" class="lesson6-example" style="display:none"></div>
+        <div id="lesson6ExamplePanel" class="lesson6-example" style="display:none">
+          <div class="lesson6-example-toolbar">
+            <button type="button" class="secondary" onclick="downloadLesson6ExampleHtml()">교사용 HTML 저장</button>
+            <button type="button" id="lesson6ExampleExpand" class="secondary" aria-haspopup="dialog" aria-controls="lesson6ExampleDialog">전체 화면</button>
+            <label class="lesson6-viewer-only">학생 선택 <select id="lesson6ViewerStudent"></select></label>
+            <button type="button" id="lesson6ExampleClose" class="secondary lesson6-viewer-only">전체 화면 닫기</button>
+          </div>
+          <div id="lesson6ExampleMotion" class="lesson6-motion"></div>
+        </div>
+        <dialog id="lesson6ExampleDialog" aria-label="6차시 모범 그래프 전체 화면"></dialog>
         <div class="progress-bar-wrap" id="progressWrap">
           <div class="progress-bar" id="progressBar"></div>
         </div>
@@ -5310,7 +5339,9 @@ function researchCaffeineSheets(source, period) {
     function clearLesson6Examples() {
       lesson6ExampleState=null;
       const panel=$("lesson6ExamplePanel");
-      panel.innerHTML="";
+      const dialog=$("lesson6ExampleDialog");
+      if(dialog.open)dialog.close();
+      $("lesson6ExampleMotion").innerHTML="";
       panel.style.display="none";
       $("showLesson6Examples").setAttribute("aria-expanded","false");
     }
@@ -5418,9 +5449,17 @@ function researchCaffeineSheets(source, period) {
       };
     }
 
+    function lesson6SelectedStudentModel(period) {
+      const sid=$("studentCompareSelect").value;
+      if(!sid)return null;
+      const klass=$("classSelectCompare").value;
+      const rows=rowsForBeforeAfterSelection(klass,true).filter(row=>row.익명ID===sid);
+      const [selected]=buildBeforeAfterEntries(rows,period);
+      return selected?lesson6PersonalModel(selected):null;
+    }
+
     function lesson6ExampleModel(period,entries=buildBeforeAfterEntries(rowsForBeforeAfterSelection(),period)) {
       const klass=$("classSelectCompare").value;
-      const sid=$("studentCompareSelect").value;
       const label=klass?klass+'반':'전체';
       const students=entries.filter(({info})=>klass||Object.hasOwn(CLASS_COMPARE_PERIODS,beforeAfterClassKey(info.반))).map(entry=>{
         const extra=lesson6ExtraMetrics(entry.before,entry.during,entry.studentRows);
@@ -5442,11 +5481,10 @@ function researchCaffeineSheets(source, period) {
       const periodDates=p=>[p.preStart,p.preEnd,p.start,p.end].map(dateKey);
       const periods=klass?[lesson6PeriodLine(periodDates(period))]:
         Object.keys(CLASS_COMPARE_PERIODS).map(key=>lesson6PeriodLine(periodDates(period.byClass?.[key]||period),key));
-      const selected=sid&&buildBeforeAfterEntries(rowsForBeforeAfterSelection(klass,true).filter(row=>row.익명ID===sid),period)[0];
       return {label,results,classChart:{
         title:klass?label+' 평균':'전체 1~4반 평균',periods,total:students.length,prefix:'6차시_'+safeFileName(label)+'_반평균',
         caffeineReference:lesson6CaffeineReference(klass),metrics
-      },personal:selected?lesson6PersonalModel(selected):null};
+      },personal:lesson6SelectedStudentModel(period)};
     }
 
     function lesson6Precision(unit) {
@@ -5616,6 +5654,10 @@ function researchCaffeineSheets(source, period) {
         .lesson6-motion button[aria-pressed=true]{background:#284d92;border-color:#284d92;color:#fff;font-weight:700}
         .lesson6-controls,.lesson6-actions{display:flex;align-items:center;flex-wrap:wrap;gap:7px;margin:8px 0}
         .lesson6-controls b{min-width:64px}.lesson6-motion figure{margin:12px 0;padding:8px;border:1px solid #d8dee9;border-radius:8px;max-width:800px}
+        .lesson6-motion [data-motion-charts]{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,380px),1fr));gap:0 14px}
+        .lesson6-motion [data-motion-charts]>p{grid-column:1/-1;margin:4px 0}
+        .lesson6-motion [data-motion-charts]>p+[data-chart]{grid-column:1/-1}
+        .lesson6-motion [data-chart]{min-width:0;margin:0}
         .lesson6-motion svg{display:block;width:100%;height:auto}.lesson6-motion .lesson6-table-wrap{overflow:auto;margin:12px 0}
         .lesson6-motion table{border-collapse:collapse;width:100%;min-width:500px}.lesson6-motion th,.lesson6-motion td{padding:7px 9px;border:1px solid #d8dee9}
         .lesson6-motion caption{text-align:left;font-weight:700;margin-bottom:5px}.lesson6-motion footer{margin-top:24px}
@@ -5623,7 +5665,7 @@ function researchCaffeineSheets(source, period) {
         .lesson6-status{font-size:13px;color:#344054}.lesson6-readout{max-width:800px}
       </style>${intro}${controls('생활습관',6,10)}${controls('수면·컨디션',0,6)}
         <div class="lesson6-actions"><button type="button" data-replay>▶ 다시 보기</button></div>
-        <div data-motion-charts></div>${tables}${studentGuide}`;
+        <div class="lesson6-content"><div data-motion-charts></div>${tables}${studentGuide}</div>`;
       const area=root.querySelector('[data-motion-charts]');
       let selected=initial;
       function draw(replay=true) {
@@ -5701,18 +5743,18 @@ function researchCaffeineSheets(source, period) {
         lesson6ExampleTable,lesson6Animate,lesson6Png,saveLesson3Blob,lesson6DocumentTitle,lesson6MotionRuntime];
       const script=helpers.map(fn=>fn.toString()).join('\n')+'\nlesson6MotionRuntime(document.getElementById("lesson6-motion"),'+data+');';
       return `<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-        <title>${title}</title><style>body{font-family:Segoe UI,Malgun Gothic,sans-serif;max-width:980px;margin:22px auto;padding:0 16px;color:#172033;line-height:1.5}</style></head>
+        <title>${title}</title><style>body{font-family:Segoe UI,Malgun Gothic,sans-serif;max-width:${view.personal&&view.classChart?1480:980}px;margin:22px auto;padding:0 16px;color:#172033;line-height:1.5}</style></head>
         <body><main id="lesson6-motion" class="lesson6-motion"></main><script>${script}</scr`+'ipt></body></html>';
     }
 
-    function renderLesson6Example() {
+    function renderLesson6Example(replay=false) {
       const example=currentLesson6Example();
       if(!example)return;
       const panel=$("lesson6ExamplePanel");
-      const previous=panel.querySelector('.lesson6-motion');
-      const initial=previous ? Number(previous.dataset.metric) : undefined;
-      panel.innerHTML='<button type="button" class="secondary" onclick="downloadLesson6ExampleHtml()">교사용 HTML 저장</button><div class="lesson6-motion"></div>';
-      lesson6MotionRuntime(panel.querySelector('.lesson6-motion'),lesson6TeacherView(example.model,$("hideLesson6ExampleIdentity").checked),initial,!previous);
+      const motion=$("lesson6ExampleMotion");
+      const previous=motion.hasChildNodes();
+      const initial=previous?Number(motion.dataset.metric):undefined;
+      lesson6MotionRuntime(motion,lesson6TeacherView(example.model,$("hideLesson6ExampleIdentity").checked),initial,replay||!previous);
       panel.style.display="block";
       $("showLesson6Examples").setAttribute("aria-expanded","true");
     }
@@ -5722,8 +5764,48 @@ function researchCaffeineSheets(source, period) {
       if(!requireResolvedIdentity())return;
       const period=getBeforeAfterPeriod();
       if(!period)return;
-      lesson6ExampleState={revision:processingRevision,selection:lesson6ExampleSelection(),model:lesson6ExampleModel(period)};
+      lesson6ExampleState={revision:processingRevision,selection:lesson6ExampleSelection(),period,model:lesson6ExampleModel(period)};
       renderLesson6Example();
+    }
+
+    function openLesson6ExampleViewer() {
+      if(!currentLesson6Example())return;
+      const dialog=$("lesson6ExampleDialog");
+      if(dialog.open)return;
+      const panel=$("lesson6ExamplePanel");
+      const source=$("studentCompareSelect");
+      const student=$("lesson6ViewerStudent");
+      const hideName=$("hideLesson6ExampleIdentity").checked;
+      student.replaceChildren(...Array.from(source.options,(option,i)=>
+        new Option(hideName&&i?`학생 ${i}`:option.textContent,option.value)));
+      student.value=source.value;
+      dialog.append(panel);
+      dialog.showModal();
+      student.focus();
+      if(document.fullscreenEnabled&&!document.fullscreenElement&&panel.requestFullscreen){
+        panel.requestFullscreen().then(()=>{
+          if(!dialog.open&&document.fullscreenElement===panel)return document.exitFullscreen();
+        }).catch(()=>{}); // The viewport-sized dialog also works when fullscreen is unavailable.
+      }
+    }
+
+    function closeLesson6ExampleViewer() {
+      const dialog=$("lesson6ExampleDialog");
+      const panel=$("lesson6ExamplePanel");
+      if(document.fullscreenElement===panel)document.exitFullscreen().catch(()=>{});
+      dialog.before(panel);
+      $("lesson6ViewerStudent").replaceChildren();
+      if(currentLesson6Example())$("lesson6ExampleExpand").focus({preventScroll:true});
+    }
+
+    function selectLesson6ViewerStudent() {
+      const example=currentLesson6Example();
+      if(!example)return;
+      $("studentCompareSelect").value=$("lesson6ViewerStudent").value;
+      updateBeforeAfterButtons();
+      lesson6ExampleState={...example,selection:lesson6ExampleSelection(),
+        model:{...example.model,personal:lesson6SelectedStudentModel(example.period)}};
+      renderLesson6Example(true);
     }
 
     function downloadLesson6ExampleHtml() {
@@ -5908,8 +5990,16 @@ function researchCaffeineSheets(source, period) {
     $("useClassObservationPeriods").addEventListener("change", () => { clearLesson6Examples(); if($("useClassObservationPeriods").checked&&$("classSelectCompare").value)applyClassObservationPeriod(); updateBeforeAfterButtons(); });
     $("studentCompareSelect").addEventListener("change", () => { clearLesson6Examples(); updateBeforeAfterButtons(); });
     $("showLesson6Examples").addEventListener("click",drawLesson6Examples);
+    $("lesson6ExampleExpand").addEventListener("click",openLesson6ExampleViewer);
+    $("lesson6ExampleClose").addEventListener("click",()=>$("lesson6ExampleDialog").close());
+    $("lesson6ExampleDialog").addEventListener("close",closeLesson6ExampleViewer);
+    $("lesson6ExamplePanel").addEventListener("fullscreenchange",()=>{
+      const dialog=$("lesson6ExampleDialog");
+      if(dialog.open&&document.fullscreenElement!==$("lesson6ExamplePanel"))dialog.close();
+    });
+    $("lesson6ViewerStudent").addEventListener("change",selectLesson6ViewerStudent);
     $("downloadLesson6StudentHtml").addEventListener("click",downloadLesson6StudentHtml);
-    $("hideLesson6ExampleIdentity").addEventListener("change",renderLesson6Example);
+    $("hideLesson6ExampleIdentity").addEventListener("change",()=>renderLesson6Example());
     ["analysisStart","analysisEnd","afternoonHour"].forEach(id=>{
       ["input","change"].forEach(event=>$(id).addEventListener(event,clearLesson6Examples));
     });
